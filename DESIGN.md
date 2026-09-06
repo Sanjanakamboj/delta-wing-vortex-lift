@@ -567,7 +567,245 @@ hand; the residual in the current run is exactly `0.0`.
   original theory, not a validation of this project's hybrid, simplified
   variant.
 
-## 11. Known limitations (Milestone 1)
+## 11. Milestone 4 — conceptual vortex-breakdown / lift-limit sensitivity
+
+### 11.1 Source audit
+
+- W. H. Wentz and D. L. Kohlman, *Vortex Breakdown on Slender Sharp-Edged
+  Wings*, Journal of Aircraft, Vol. 8, No. 3, 1971, based on their
+  University of Kansas wind-tunnel study (NASA CR-98737, 1969). A
+  systematic schlieren-flow-visualization study of vortex breakdown
+  position over sharp-edged delta and modified-delta wings across leading-
+  edge sweep 45°–85° at $Re \approx 1\times10^6$. Key findings directly
+  relevant here: (i) at low $\alpha$ the leading-edge vortex bursts far
+  downstream of the trailing edge; as $\alpha$ increases, the burst point
+  moves forward over the wing, eventually reaching the trailing edge and
+  then the apex; (ii) increased leading-edge sweep **delays** breakdown
+  (a given burst location requires a higher $\alpha$ for more highly swept
+  wings); (iii) for sweep angles above about 75°, the breakdown-vs-$\alpha$
+  behavior becomes nearly independent of sweep; (iv) breakdown location is
+  far more sensitive to changes in planform near the apex than near the
+  trailing edge.
+- K. D. Visser and R. C. Nelson, *An experimental analysis of critical
+  factors involved in the breakdown process of leading-edge vortex flows*
+  (NASA/NTRS 19910014797). Crosswire measurements over 70° and 75° delta
+  wings identify the vortex's own circulation and accompanying pressure
+  field — both of which grow with $\alpha$ — as the dominant factors
+  controlling breakdown onset, rather than boundary-layer separation from
+  the trailing edge.
+- Related NASA vortex-breakdown literature (e.g. NTRS 19920003799,
+  *Breaking down the delta wing vortex: The role of vorticity in the
+  breakdown process*) reinforces that breakdown is an internal
+  hydrodynamic-instability process of the concentrated vortex core (an
+  adverse axial pressure gradient causes a rapid, localized expansion —
+  a "bubble" or "spiral" disruption — of the core, with a large loss of
+  swirl velocity and the associated upper-surface suction).
+- E. C. Polhamus, NASA TN D-3767 (1966) and NASA TN D-4739 (1968) remain
+  the sources for the *pre-breakdown* vortex-lift and vortex-drag terms
+  (unchanged, §9 and §10). Neither report attempts to predict breakdown;
+  both explicitly assume the leading-edge vortex reattaches on the upper
+  surface.
+
+### 11.2 Vortex breakdown vs. conventional stall
+
+Vortex breakdown is a **distinct physical phenomenon from ordinary 2-D
+airfoil (trailing-edge/boundary-layer) stall**: it is an axial-flow
+instability internal to the concentrated leading-edge vortex core itself —
+governed by the vortex's own circulation and pressure field (Visser &
+Nelson) — not a separation of the surface boundary layer from an adverse
+pressure gradient along the chord (the classical stall mechanism). Its
+onset location and angle depend strongly on planform (especially sweep and
+apex shape, per Wentz & Kohlman) and on angle of attack, with some Reynolds-
+number sensitivity reported for secondary-vortex/transition behavior even
+where primary breakdown location was comparatively Re-insensitive in the
+ranges tested.
+
+None of the cited studies characterize this project's own generic,
+illustrative wing (never wind-tunnel- or CFD-tested; see §7), so this
+repository has **no validated, geometry/Re/Mach-specific data** from which
+to derive an exact breakdown-onset angle. Milestone 4 is therefore
+explicitly a **sensitivity / high-angle-validity limiting model**, not a
+predictive breakdown model. Every onset angle used is labeled an "assumed
+breakdown onset" or a "breakdown-onset sensitivity case," never a
+prediction.
+
+### 11.3 Mathematical transition model
+
+The pre-breakdown M1–M3 model is preserved exactly (see §11.7 for the
+verified below-transition identities); a smooth, monotonically
+non-increasing effectiveness factor multiplies only the vortex-lift term:
+
+$$f_b(\alpha) = f_{post} + (1-f_{post})\cdot\frac{1}{2}\Bigl(1-\tanh\bigl(\tfrac{\alpha-\alpha_b}{w}\bigr)\Bigr), \qquad w = \frac{\Delta\alpha}{2}$$
+
+$$C_{L,\text{vortex,effective}}(\alpha) = C_{L,\text{vortex,pre}}(\alpha)\cdot f_b(\alpha), \qquad C_{L,\text{total,effective}}(\alpha) = C_{L,\text{attached}}(\alpha) + C_{L,\text{vortex,effective}}(\alpha)$$
+
+implemented as `vortex_effectiveness` / `effective_vortex_lift_coefficient`
+in [`breakdown.py`](src/delta_vortex_lift/breakdown.py). This form is
+$C^\infty$ smooth (no discontinuity or kink anywhere), strictly decreasing
+in $\alpha$, satisfies $f_b\to1$ as $\alpha\to-\infty$ and $f_b\to f_{post}$
+as $\alpha\to+\infty$, and never introduces a hard clip, step, or
+oscillation. The width scale $w=\Delta\alpha/2$ is a documented modeling
+choice: over $\alpha_b\pm\Delta\alpha$, $\tanh(\pm1)\approx\pm0.76$, placing
+most of the transition inside the declared width without being a rigid
+cutoff.
+
+**Default illustrative parameters** (assumed sensitivity inputs, not
+predictions): $\alpha_b=20°$ — qualitatively consistent with the
+Wentz-Kohlman finding that, for sharply-swept (60°–70°) sharp-edged delta
+wings, the vortex burst location begins moving onto the wing in roughly
+this $\alpha$ region, but **not** a quantitative reproduction of their data
+for this project's specific generic wing; $\Delta\alpha=4°$; $f_{post}=0.45$
+(within the declared 0.3–0.6 conceptual range).
+
+### 11.4 Drag treatment
+
+Per §10's own logic (the M3 vortex-drag term is itself a resolution of the
+vortex *lift* force via $\tan\alpha$), the same effectiveness factor is
+applied to that resolved force rather than inventing a new post-breakdown
+drag polar:
+
+$$C_{D,\text{vortex,effective}}(\alpha) = C_{L,\text{vortex,effective}}(\alpha)\tan\alpha, \qquad C_{D,\text{total}}(\alpha) = C_{D0} + C_{Di,\text{attached}}(\alpha) + C_{D,\text{vortex,effective}}(\alpha)$$
+
+$C_{Di,\text{attached}}$ and $C_{D0}$ are unchanged from `drag.py`. This
+asks only "what happens to the *existing* reduced-order model if vortex
+effectiveness degrades" — it does not claim to model separated-flow drag
+accurately.
+
+### 11.5 Domain extension
+
+The declared $\alpha$ domain is extended from 0–25° to **0–30°** only for
+this milestone's breakdown-sensitivity figures/script, to make the
+transition visible. All M1–M3 comparisons and reference values (e.g. the
+usable-region L/D reference, §11.6) remain computed on the original 0–25°
+domain; the linear attached-flow model is not asserted to be any more valid
+in 25°–30° than it already was not validated to be at 20°–25°.
+
+### 11.6 Predeclared conceptual usable-AoA rule
+
+Declared here, in the source code (`usable_alpha_limit`), and in the study
+script *before* the resulting numeric envelope was computed or inspected —
+consistent with the instruction to fix the rule before seeing the result.
+The region $[0,\alpha_{upper}]$ is "usable" (a **conceptual usable-AoA
+region** / **pre-breakdown operating region** — never a "safe flight
+envelope," "stall boundary," or "certified AoA limit") iff, for every
+$\alpha$ in that interval:
+
+1. **Vortex effectiveness remains high**: $f_b(\alpha) \ge 0.9$ — chosen as
+   a round, defensible threshold meaning "at least 90% of the pre-breakdown
+   vortex lift is still believed effective," consistent with the general
+   engineering convention of treating a 10% loss as the threshold of
+   material effect.
+2. **Efficiency has not meaningfully degraded past its own peak**: for
+   $\alpha$ at or beyond the breakdown-limited L/D curve's own maximum
+   (chosen so that L/D's natural rise from exactly zero at $\alpha=0$ is
+   never misread as "degradation" — an early implementation bug, described
+   in §11.9, made exactly this mistake), $L/D(\alpha) \ge 0.9\times$ the
+   pre-breakdown (M3) best-sampled reference L/D over $\alpha\in[0°,25°]$.
+   The reference is fixed to the pre-breakdown model specifically so the
+   rule does not silently redefine its own goalposts as the breakdown
+   parameters change.
+3. **Never exceeds the original validated domain**: $\alpha \le 25°$,
+   regardless of what the breakdown model alone would suggest.
+
+Both numeric thresholds (0.9 and 0.9) are round, conservative, and
+declared before computation — not tuned after inspecting the resulting
+envelope.
+
+### 11.7 Independent verification
+
+`tests/test_breakdown.py` includes (see the file for the complete set):
+below-transition identities showing M4 reduces to M2 (vortex lift) and M3
+(total drag) to within $10^{-4}$ absolute tolerance for $\alpha\le10°$;
+$f_b$ bounds $(0,1]$, monotonicity, and smoothness (no jump at the
+transition boundaries); $f_b\to1$ at low $\alpha$ and $f_b\to f_{post}$ at
+high $\alpha$; effective vortex lift never exceeding the pre-breakdown
+value and remaining non-negative; scalar/array consistency; absence of
+NaN/Inf over the full extended study domain; invalid-input rejection
+(non-finite $\alpha$, invalid $\alpha_b$/$\Delta\alpha$/$f_{post}$, invalid
+`ld_reference`); sensitivity-direction checks (later $\alpha_b$ delays the
+reduction in vortex lift; larger $f_{post}$ retains more vortex lift); an
+exact drag identity ($C_{D,\text{vortex,effective}} =
+C_{L,\text{vortex,effective}}\tan\alpha$); the L/D identity and its
+$\alpha=0$ value; hard-coded regressions confirming the exact M1, M2, and
+M3 numbers are unchanged; a degree/radian cross-check; independent
+hand-formula checks for both $f_b$ and the effective vortex lift; and a
+sanity check that `usable_alpha_limit` always returns a value within the
+declared $[0°,25°]$ domain. `scripts/breakdown_study.py` additionally
+reconstructs one full $(C_L,C_D)$ pair directly from the documented
+formulas by hand; the residual in the current run is exactly `0.0` for
+both.
+
+### 11.8 Sensitivity methodology
+
+- **Onset angle** $\alpha_b\in\{17°,20°,23°\}$ (fixed $\Delta\alpha,
+  f_{post}$): the single most consequential assumption, since it is
+  qualitatively motivated (§11.1) but not quantitatively validated for this
+  wing.
+- **Transition width** $\Delta\alpha\in\{3°,4°,5°\}$ (fixed $\alpha_b,
+  f_{post}$): quantifies how much the sharpness of the assumed transition
+  (as opposed to its location) matters.
+- For each case, $C_L$, $C_D$, and L/D are tabulated at representative
+  $\alpha$, along with the angle at which effective vortex lift has fallen
+  10% and 50% below its pre-breakdown value, and — separately from the
+  compound usable-region rule — the angle at which $f_b$ alone first drops
+  below 0.9, to isolate the breakdown assumption's own sensitivity from the
+  rule's other (already-present-in-M3) constraint.
+
+### 11.9 Numerical sanity audit and a bug found/fixed
+
+Before accepting results: M4 was confirmed to equal M1–M3 below the
+transition (§11.7); $f_b$ is smooth, monotonic, and bounded; no negative
+drag or positive-$\alpha$ lift occurs; no NaN/Inf; no discontinuities or
+oscillations; post-breakdown vortex lift is confirmed lower than the
+unbounded extrapolation at high $\alpha$ (§13); later assumed onset and
+larger retained fraction were confirmed, numerically, to produce weaker
+degradation; no hidden clipping was introduced; nothing is called
+"validated."
+
+**Bug found and fixed during development**: the first implementation of
+`usable_alpha_limit` applied the L/D-fraction criterion across the *entire*
+$[0°,25°]$ range, including $\alpha=0$, where $C_L=0$ makes $L/D=0$ by
+construction (not a breakdown-related degradation). Since $0 < 0.9\times
+L/D_{ref}$ trivially, this made the function return an upper edge of
+exactly $0°$ for every onset case — an obviously wrong result caught by
+manual inspection before any test was written against it. The fix (§11.6,
+item 2) restricts the L/D criterion to the region at or beyond the
+breakdown-limited curve's own peak, so the naturally-rising low-$\alpha$
+branch is never misread as degradation.
+
+An interesting, non-obvious but fully model-consistent feature also
+appeared during review: the breakdown-limited $C_{L,\text{total}}(\alpha)$
+curves show a brief near-plateau through the transition region before
+resuming a shallower rise (visible in
+`figures/lift_with_breakdown.png`). This is not an error — it is the
+expected superposition of a rapidly-falling $f_b$ against a still-growing
+$C_{L,\text{vortex,pre}}(\alpha) \propto \cos\alpha\sin^2\alpha$ (which
+itself keeps increasing until $\alpha\approx54.7°$, well outside this
+project's domain); the two effects briefly nearly cancel before $f_b$'s
+asymptote to $f_{post}$ makes the pre-breakdown term's growth dominate
+again. Per the milestone's own instruction, total lift was not forced to
+be monotonic, and it is not.
+
+### 11.10 Validity boundaries
+
+- Restricted to and only claimed valid, as a sensitivity study, over
+  $\alpha\in[0°,30°]$; M1–M3 comparisons remain confined to their original
+  $[0°,25°]$ domain.
+- $\alpha_b$, $\Delta\alpha$, and $f_{post}$ are explicit, illustrative
+  sensitivity parameters, never validated breakdown predictions for this
+  project's specific generic wing.
+- The conceptual usable-AoA region is a predeclared-rule construct, not a
+  physical limit, safety margin, or certification boundary of any kind.
+- No pitching moment, trim, longitudinal stability, control surfaces, CFD
+  comparison, real-aircraft matching, or structural consideration is
+  included — out of scope for this milestone.
+- No experimental or CFD validation is performed in this project; the
+  qualitative trends cited from Wentz & Kohlman and the NASA vortex-core
+  literature (§11.1) describe *their* wind-tunnel findings for *their*
+  specific wings, not a validation of this project's generic, illustrative
+  geometry or its assumed sensitivity parameters.
+
+## 12. Known limitations (Milestone 1)
 
 - The attached-flow model is a classical, moderate/high-AR lifting-line
   result; its assumptions are known to be violated by this low-AR,

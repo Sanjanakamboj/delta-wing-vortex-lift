@@ -12,8 +12,15 @@ Milestone 3: a reduced-order, Polhamus-inspired drag-due-to-lift and L/D
 model (see drag.py), combining classical attached induced drag with a
 vortex drag-due-to-lift term. See DESIGN.md for what is and is not adopted
 from the original Polhamus (1968) drag-due-to-lift theory.
+
+Milestone 4: a conceptual vortex-breakdown / high-angle validity
+SENSITIVITY model (see breakdown.py) -- not a breakdown prediction -- that
+multiplies the unchanged M2 vortex-lift term by a smooth effectiveness
+factor above an assumed, illustrative onset angle, propagates that into the
+M3 drag/L-D model, and defines a predeclared conceptual usable-AoA region.
+See DESIGN.md for the source audit and the exact list of assumptions.
 """
 
-from . import attached_flow, drag, geometry, vortex_lift
+from . import attached_flow, breakdown, drag, geometry, vortex_lift
 
-__all__ = ["geometry", "attached_flow", "vortex_lift", "drag"]
+__all__ = ["geometry", "attached_flow", "vortex_lift", "drag", "breakdown"]

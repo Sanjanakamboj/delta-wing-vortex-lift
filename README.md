@@ -288,16 +288,104 @@ python scripts/make_drag_sensitivity_figure.py
   range, not claimed aerodynamic optima.
 - No experimental or CFD validation is used or implied.
 
+## Milestone 4: vortex-breakdown / lift-limit sensitivity and usable-AoA envelope
+
+### Engineering question
+
+> The M2/M3 Polhamus-style model extrapolates vortex lift indefinitely.
+> Real leading-edge vortices eventually break down. Without geometry/Re/
+> Mach-specific data to predict exactly when, how much does that
+> uncertainty change the lift, drag, and L/D picture — and what is a
+> transparent, conceptual "usable" angle-of-attack region given that
+> uncertainty?
+
+### Why M2/M3 need a high-angle validity treatment
+
+Nothing in the Polhamus (1966/1968) lift/drag algebra used in M2/M3
+predicts vortex breakdown — both reports explicitly assume the leading-edge
+vortex remains intact and reattaches on the upper surface. Left unchecked,
+M2/M3 extrapolate that assumption indefinitely, which is not defensible at
+higher angles of attack.
+
+### Source audit
+
+- W. H. Wentz and D. L. Kohlman, *Vortex Breakdown on Slender Sharp-Edged
+  Wings*, Journal of Aircraft, Vol. 8, No. 3, 1971 (Univ. of Kansas study,
+  NASA CR-98737, 1969): systematic schlieren study across sweep 45°–85°
+  showing breakdown location moves forward with α, is delayed by higher
+  sweep, and becomes sweep-independent above ~75°.
+- K. D. Visser and R. C. Nelson, NASA/NTRS 19910014797: identifies the
+  vortex core's own circulation/pressure field (not trailing-edge
+  separation) as the driver of breakdown onset — a distinct mechanism from
+  2-D boundary-layer stall.
+- These sources establish: (1) breakdown is physically distinct from
+  ordinary stall, (2) onset depends strongly on sweep/planform and α, (3)
+  this project has no validated data for its own generic wing, so (4) M4 is
+  a **sensitivity model, not a breakdown prediction**.
+
+### Breakdown-effectiveness equation
+
+$$f_b(\alpha) = f_{post} + (1-f_{post})\cdot\tfrac12\bigl(1-\tanh(\tfrac{\alpha-\alpha_b}{w})\bigr), \quad w=\tfrac{\Delta\alpha}{2}$$
+$$C_{L,\text{vortex,effective}} = C_{L,\text{vortex,pre}}\cdot f_b(\alpha), \qquad C_{D,\text{vortex,effective}} = C_{L,\text{vortex,effective}}\tan\alpha$$
+
+M1's attached term and M3's $C_{Di,\text{attached}}$/$C_{D0}$ are **unchanged**.
+
+### Default assumptions (illustrative, not predictions)
+
+$\alpha_b = 20°$, $\Delta\alpha = 4°$, $f_{post} = 0.45$ — qualitatively motivated by the sweep/α trends above, not a quantitative fit to any dataset for this wing.
+
+### Sensitivity cases
+
+$\alpha_b \in \{17°, 20°, 23°\}$ (fixed $\Delta\alpha$, $f_{post}$); $\Delta\alpha \in \{3°, 4°, 5°\}$ (fixed $\alpha_b$, $f_{post}$).
+
+### Predeclared conceptual usable-AoA rule
+
+Declared *before* computing the result: usable iff (a) $f_b \ge 0.9$, (b) past its own peak, breakdown-limited $L/D \ge 0.9\times$ the pre-breakdown (M3) reference L/D, (c) $\alpha \le 25°$ (original M1–M3 domain).
+
+### Representative results (default case, $\Lambda_{LE}=65°$)
+
+| $\alpha$ | $f_b$ | $C_{L,\text{total}}$ | $C_{D,\text{total}}$ | $L/D$ |
+|---:|---:|---:|---:|---:|
+| 15° | 0.996 | 0.963 | 0.192 | 5.02 |
+| 20° | 0.725 | 1.264 | 0.314 | 4.03 |
+| 25° | 0.454 | 1.493 | 0.438 | 3.41 |
+| 30° | 0.450 | 1.823 | 0.641 | 2.84 |
+
+### Key finding
+
+At α=25°, breakdown-limited $C_{L,\text{total}}$ is **16.4% lower** than the unbounded M2/M3 extrapolation (1.493 vs. 1.785) — but breakdown-limited **L/D is 9.7% higher** (3.41 vs. 3.11), because stripping away disproportionately drag-heavy vortex lift removes more drag than lift. **The resulting usable-AoA upper edge (10.6°) is identical across all three onset cases** — the binding constraint is ordinary induced-drag-driven L/D decay (already present in M3), not the vortex-breakdown assumption itself. The low/mid-angle Polhamus-style model is robust to this new limiter; only the high-angle picture is assumption-dependent.
+
+### Figures
+
+- [`figures/vortex_breakdown_effectiveness.png`](figures/vortex_breakdown_effectiveness.png) — $f_b(\alpha)$ for all onset cases.
+- [`figures/lift_with_breakdown.png`](figures/lift_with_breakdown.png) — attached-only, unbounded M2/M3, and breakdown-limited lift.
+- [`figures/lift_to_drag_with_breakdown.png`](figures/lift_to_drag_with_breakdown.png) — L/D comparison, best-sampled points marked.
+- [`figures/usable_alpha_region.png`](figures/usable_alpha_region.png) — normalized $f_b$ and L/D with the shaded conceptual usable region.
+
+Reproduce with:
+
+```bash
+python scripts/breakdown_study.py
+python scripts/make_breakdown_effectiveness_figure.py
+python scripts/make_lift_with_breakdown_figure.py
+python scripts/make_lift_to_drag_with_breakdown_figure.py
+python scripts/make_usable_alpha_region_figure.py
+```
+
+### Limitations
+
+- $\alpha_b$, $\Delta\alpha$, $f_{post}$ are explicit, illustrative sensitivity parameters — never validated breakdown predictions for this project's generic wing.
+- The 25–30° extension is used only for this sensitivity study; M1–M3 comparisons remain on their original 0–25° domain.
+- "Usable-AoA region" is a predeclared-rule construct, never a "safe flight envelope," "stall boundary," or "certified AoA limit."
+- No experimental or CFD validation is used or implied.
+
 ## Roadmap
 
 - **Milestone 1:** geometry, conventions, attached-flow baseline. ✅
-- **Milestone 2:** Polhamus-style reduced-order vortex-lift contribution,
-  combined with the unchanged attached-flow baseline into a total lift
-  curve, with sweep/coefficient sensitivity study. ✅
-- **Milestone 3:** reduced-order, Polhamus-inspired drag-due-to-lift model,
-  aerodynamic polar, L/D comparison between attached-only and
-  attached+vortex models, and drag-assumption sensitivity. ✅
-- **Milestone 4 (not started):** out of scope for now — no vortex
-  breakdown, stall, pitching moment, trim, longitudinal stability, CFD
-  comparison, real-aircraft matching, or structural/flight-performance work
-  has been implemented.
+- **Milestone 2:** Polhamus-style reduced-order vortex-lift contribution. ✅
+- **Milestone 3:** reduced-order drag-due-to-lift, polar, and L/D. ✅
+- **Milestone 4:** conceptual vortex-breakdown/lift-limit sensitivity model
+  and predeclared usable-AoA region. ✅
+- **Milestone 5 (not started):** out of scope for now — no pitching moment,
+  trim, longitudinal stability, control surfaces, CFD comparison, real-
+  aircraft matching, or structural sizing has been implemented.
