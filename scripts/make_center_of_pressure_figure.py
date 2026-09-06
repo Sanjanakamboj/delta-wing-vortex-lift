@@ -81,8 +81,9 @@ def make_figure(save_path: Path) -> None:
     ax.text(
         0.02,
         0.03,
-        "No point plotted at alpha=0 (total lift and x_cp undefined there).\n"
-        "Nominal (co-located) model gives a constant x_cp -- see DESIGN.md.",
+        r"No point plotted at $\alpha=0^\circ$ (total lift and $x_{cp}$ undefined there)."
+        "\n"
+        r"Nominal (co-located) model gives a constant $x_{cp}$ — see DESIGN.md.",
         transform=ax.transAxes,
         fontsize=8,
         va="bottom",

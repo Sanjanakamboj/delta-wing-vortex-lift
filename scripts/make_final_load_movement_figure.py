@@ -66,7 +66,7 @@ def make_figure(save_path: Path) -> None:
     ax1.set_title(r"(a) Center-of-pressure movement", fontsize=10.5)
     ax1.set_xlim(ALPHA_MIN_DEG, ALPHA_MAX_DEG)
     ax1.grid(True, linestyle=":", linewidth=0.5, alpha=0.6)
-    ax1.legend(loc="center right", fontsize=7.8)
+    ax1.legend(loc="lower left", fontsize=7.8)
 
     ax2.plot(alpha_deg, np.asarray(cm_nominal, dtype=float), color="#2ca02c", linewidth=2.0, label="nominal (co-located)")
     ax2.plot(alpha_deg, np.asarray(cm_sens_limited, dtype=float), color="#d62728", linewidth=2.2, label="sensitivity case (x_vortex - 0.10)")

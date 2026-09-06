@@ -44,7 +44,7 @@ def make_figure(save_path: Path) -> None:
     alpha_rad = np.radians(alpha_deg)
 
     fig = plt.figure(figsize=(13, 10.5), dpi=150)
-    gs = fig.add_gridspec(2, 2, hspace=0.32, wspace=0.28)
+    gs = fig.add_gridspec(2, 2, hspace=0.32, wspace=0.28, top=0.80)
     ax_geo = fig.add_subplot(gs[0, 0])
     ax_lift = fig.add_subplot(gs[0, 1])
     ax_ld = fig.add_subplot(gs[1, 0])
@@ -91,7 +91,7 @@ def make_figure(save_path: Path) -> None:
     ax_ld.set_xlabel(r"$\alpha$ [deg]")
     ax_ld.set_ylabel(r"$L/D$")
     ax_ld.set_title("(3) Efficiency (best sampled, not an optimum)", fontsize=10)
-    ax_ld.set_ylim(bottom=0.0)
+    ax_ld.set_ylim(0.0, ld_limited[i_best] * 1.18)
     ax_ld.grid(True, linestyle=":", linewidth=0.4, alpha=0.5)
 
     # --- Panel 4: center of pressure / Cm ---
@@ -126,7 +126,7 @@ def make_figure(save_path: Path) -> None:
     )
     fig.text(
         0.5,
-        0.965,
+        0.895,
         summary_text,
         ha="center",
         va="top",
@@ -137,7 +137,7 @@ def make_figure(save_path: Path) -> None:
     fig.suptitle(
         "Generic 65° Delta Wing — Reduced-Order Aerodynamic Study Summary",
         fontsize=13,
-        y=1.04,
+        y=1.02,
     )
     fig.savefig(save_path, bbox_inches="tight")
     plt.close(fig)

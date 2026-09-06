@@ -80,7 +80,7 @@ def make_figure(save_path: Path) -> None:
     draw_force(x_attached, r"$L_{\mathrm{attached}}$" + "\n" + r"$x_{\mathrm{attached}}/c_r=%.3f$" % params.x_attached_hat, "#1f77b4", y_off=0.9)
     draw_force(x_vortex, r"$L_{\mathrm{vortex}}$" + "\n" + r"$x_{\mathrm{vortex}}/c_r=%.3f$" % params.x_vortex_hat, "#d62728", y_off=-0.9)
     ax.text(
-        x_attached + 0.15,
+        x_attached + 0.55,
         0.05,
         "(shown at different y only for visual clarity;\nboth act at the same x in the nominal model)",
         fontsize=7,

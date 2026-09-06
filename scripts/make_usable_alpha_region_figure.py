@@ -96,12 +96,12 @@ def make_figure(save_path: Path) -> None:
     ax.text(
         0.98,
         0.60,
-        f"Rule: usable iff BOTH\n"
-        f"  f_b >= {USABLE_MIN_EFFECTIVENESS}  (blue dotted line)\n"
-        f"  L/D >= {USABLE_MIN_LD_FRACTION} x reference past its peak  (red dotted line)\n"
-        f"  and alpha <= 25°\n"
-        "Reference L/D is the pre-breakdown (M3) best-sampled\n"
-        "value over [0°, 25°], NOT this curve's own peak.",
+        r"Rule: usable iff BOTH" + "\n"
+        rf"  $f_b \geq {USABLE_MIN_EFFECTIVENESS}$  (blue dotted line)" + "\n"
+        rf"  $L/D \geq {USABLE_MIN_LD_FRACTION}\,(L/D)_{{\mathrm{{ref}}}}$ past its peak  (red dotted line)" + "\n"
+        r"  and $\alpha \leq 25^\circ$" + "\n"
+        r"Reference $L/D$ is the pre-breakdown (M3) best-sampled" + "\n"
+        r"value over $[0^\circ, 25^\circ]$, NOT this curve's own peak.",
         transform=ax.transAxes,
         fontsize=8,
         va="top",
