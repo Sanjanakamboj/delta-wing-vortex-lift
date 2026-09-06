@@ -221,7 +221,197 @@ from the hand-written formula (not by calling the module's own
 `attached_flow_CL` function for that specific value) and prints the
 residual, which is exactly `0.0` in the current run.
 
-## 9. Known limitations
+## 9. Milestone 2 — Polhamus-style reduced-order vortex lift
+
+### 9.1 What Polhamus (1966) modeled
+
+E. C. Polhamus, *A Concept of the Vortex Lift of Sharp-Edge Delta Wings
+Based on a Leading-Edge-Suction Analogy*, NASA TN D-3767, December 1966
+(<https://ntrs.nasa.gov/citations/19670003842>) models the total lift of a
+thin, sharp-leading-edge delta wing as the sum of two physically distinct
+contributions once the leading edge separates and the resulting spiral
+vortex sheet **reattaches** on the upper surface inboard of the leading
+edge:
+
+1. A **potential-flow ("attached") term**, modified for the fact that a
+   sharp, separated leading edge cannot support any leading-edge suction
+   (Kutta-type condition), so the normal force reduces to the potential-flow
+   normal force resolved through the angle of attack:
+   $$C_{L,p} = C_{N,p}\cos\alpha = K_p\sin\alpha\cos^2\alpha \qquad \text{(Polhamus eq. 5)}$$
+   where $K_p$ is a lift-curve-slope-like constant determined from
+   lifting-surface theory (Polhamus used a modified Multhopp method) and
+   depends only on planform. For small $\alpha$, eq. (5) reduces to
+   $C_{L,p}\approx K_p\alpha$, so $K_p$ plays the same role as this
+   project's attached-flow slope $a$.
+
+2. A **vortex-lift term**, obtained by an analogy: the force needed to
+   sustain the separated, reattaching leading-edge vortex is assumed equal
+   in magnitude to the leading-edge suction force that *would* have existed
+   for attached potential flow around that same leading edge, but rotated
+   to act normal to the wing chord (since the vortex flow, unlike attached
+   flow, produces no force in-plane). This is his eq. (12):
+   $$C_{L,v} = K_v\cos\alpha\sin^2\alpha \qquad \text{(Polhamus eq. 12)}$$
+   with, per his eq. (13),
+   $$K_v = \frac{K_p - K_p^2 K_i}{\cos\Lambda_{LE}}$$
+   where $K_i = \partial C_{D_i}/\partial C_L^2$ is the induced-drag
+   parameter, also obtained from lifting-surface theory. His fig. 9 reports
+   $K_v$ ranging only slowly with aspect ratio, from about 3.14 at $AR=0$ to
+   about 3.45 at $AR=4$, for the family of wings he studied — and states
+   explicitly that this weak AR dependence should not be assumed general
+   (e.g. it would differ for arrow/diamond planforms).
+
+The total lift is then $C_L = C_{L,p} + C_{L,v}$ (his eq. 14/15), and he
+shows excellent agreement with wind-tunnel data for sharp-edge delta wings
+of aspect ratio 0.5–2.0 up to $\alpha \approx 20$–$25°$ (his figs. 5, 11,
+12) — directly relevant to this project's $AR\approx1.87$ representative
+wing.
+
+### 9.2 Why sharp-edged, highly swept wings generate vortex lift
+
+At a sharp leading edge, potential flow theory would require an
+infinite velocity (and hence infinite suction) to turn the flow around the
+edge. Physically, the flow instead separates right at the edge. For a
+highly swept delta wing, this separated shear layer rolls up into a stable,
+conical, spiral vortex above the upper surface rather than simply stalling;
+flow reattaches on the wing inboard of the vortex core (Polhamus fig. 1),
+inducing a strong low-pressure region and hence extra ("vortex") lift not
+present in any attached-flow theory. This is fundamentally different from
+classical trailing-edge/thickness-driven stall and is the reason this
+project's Milestone 1 attached-flow baseline — a theory that assumes
+attached flow throughout — cannot capture delta-wing lift once $\alpha$
+departs from zero by more than a few degrees.
+
+### 9.3 What this project adopts from the original theory
+
+- The **functional form** of the vortex-lift term, eq. (12):
+  $C_{L,v} = K_v\cos\alpha\sin^2\alpha$, used here verbatim as
+  `vortex_lift_coefficient` in
+  [`vortex_lift.py`](src/delta_vortex_lift/vortex_lift.py).
+- The **sweep dependence** implied by eq. (13), $K_v \propto
+  1/\cos\Lambda_{LE}$, used here (see §9.4) as the sourced, defensible part
+  of the sweep sensitivity.
+
+### 9.4 What is intentionally simplified or deferred
+
+- **$K_p$ and $K_i$ are not recomputed.** Polhamus determined both from a
+  full numerical lifting-surface solution (a modified Multhopp method).
+  Reproducing that is out of scope for this reduced-order portfolio
+  milestone. Instead, $K_v$ is treated as an explicit, illustrative
+  reference constant `KV_REFERENCE = 3.30`, chosen within — but not fitted
+  to — the numerical range Polhamus himself reports (~3.14–3.45). This
+  value is stated plainly everywhere it is used and is never presented as a
+  universal delta-wing constant.
+- **Sweep scaling holds the $(K_p - K_p^2 K_i)$ prefactor fixed.** Eq. (13)
+  shows $K_v$ depends on both $1/\cos\Lambda_{LE}$ *and* on
+  $(K_p - K_p^2 K_i)$, which itself depends weakly on planform per
+  Polhamus's own fig. 9. This project holds that prefactor fixed at the
+  value implied by `(KV_REFERENCE, SWEEP_REFERENCE_RAD=65°)` and varies only
+  the $1/\cos\Lambda_{LE}$ factor:
+  $$K_v(\Lambda_{LE}) = K_{v,\text{ref}}\,\frac{\cos(65°)}{\cos\Lambda_{LE}}$$
+  implemented as `kv_of_sweep`. This is a documented approximation, not a
+  full re-derivation of the prefactor's own planform dependence.
+- **The vortex term is added to this project's own linear M1 baseline, not
+  to Polhamus's nonlinear potential term.** Polhamus's full theory combines
+  two *nonlinear* terms ($K_p\sin\alpha\cos^2\alpha$ +
+  $K_v\cos\alpha\sin^2\alpha$). This project instead keeps Milestone 1's
+  classical, linear, lifting-line attached-flow baseline
+  ($C_{L,\text{attached}} = a\alpha$, unchanged) and adds only the Polhamus
+  vortex term on top:
+  $$C_{L,\text{total}}(\alpha) = \underbrace{a\alpha}_{\text{M1, unchanged}} + \underbrace{K_v(\Lambda_{LE})\cos\alpha\sin^2\alpha}_{\text{Polhamus-style}}$$
+  This preserves the project's milestone structure (M1 untouched) at the
+  cost of deviating from Polhamus's exact combined formula. The difference
+  is small at low $\alpha$ (both $a\alpha$ and $K_p\sin\alpha\cos^2\alpha$
+  reduce to a linear term there) and is explicitly documented rather than
+  hidden.
+- **No vortex breakdown or stall.** Polhamus's own data (fig. 12) shows good
+  agreement up to $\alpha\approx20$–$25°$ with some degradation above that
+  for higher-AR wings due to trailing-edge separation — a distinct physical
+  effect from leading-edge vortex breakdown, and not modeled either way
+  here. This project restricts its study range to $\alpha\in[0°,25°]$ for
+  this reason and states explicitly, in the figures, the study script, and
+  here, that vortex breakdown and stall are not modeled and the curves
+  should not be extrapolated further.
+
+This model is referred to throughout the project as **"Polhamus-style" /
+"Polhamus-inspired" reduced-order vortex lift** — explicitly not a full,
+validated Polhamus aerodynamic prediction.
+
+### 9.5 Sign convention
+
+Consistent with §3: $\alpha\ge0$ in the study domain, $C_{L,\text{vortex}}
+\ge 0$ throughout (since $\cos\alpha>0$ and $\sin^2\alpha\ge0$ for
+$\alpha\in(-90°,90°)$), so the vortex term never fights the attached-flow
+term in sign over the domains used in this project. $C_{L,\text{vortex}}(0)
+=0$ exactly, since $\sin(0)=0$.
+
+### 9.6 Coefficient interpretation
+
+- $K_v$ is *not* a lift-curve slope; it has units of $C_L$ per unit
+  $\cos\alpha\sin^2\alpha$, i.e. it sets the overall scale of the nonlinear
+  vortex contribution. Because $\cos\alpha\sin^2\alpha \sim \alpha^2$ for
+  small $\alpha$, the vortex term is second-order in $\alpha$ near zero and
+  is negligible compared with the first-order attached-flow term there —
+  consistent with vortex lift being a moderate-to-high-$\alpha$ phenomenon.
+- The chosen functional form $\cos\alpha\sin^2\alpha$ has an analytical
+  interior maximum at $\alpha^\star = \arctan\sqrt2 \approx 54.7°$, a
+  property of the trigonometric form itself (verified in
+  `test_vortex_lift_analytical_maximum_location`), well outside this
+  project's $0$–$25°$ study range and not physically meaningful here (real
+  vortex breakdown would intervene long before that angle) — noted so the
+  reader does not mistake it for a modeled physical limit.
+
+### 9.7 Sensitivity rationale
+
+Two sensitivities are studied, both requested to isolate what actually
+drives the vortex-lift magnitude in this reduced-order model:
+
+- **Sweep**, $\Lambda_{LE}\in\{55°,65°,75°\}$: this is the sourced part of
+  the model (§9.4), so showing how strongly $C_{L,\text{vortex}}$ responds
+  to sweep is a direct test of the model's most defensible assumption.
+- **Coefficient**, $K_v \in \{0.8,1.0,1.2\}\times K_{v,\text{ref}}$: since
+  $K_{v,\text{ref}}$ is stated as illustrative rather than derived, a
+  $\pm20\%$ sweep quantifies how much the headline vortex-lift fraction
+  results depend on that one uncertain choice.
+
+### 9.8 Independent verification
+
+`tests/test_vortex_lift.py` includes (not an exhaustive restatement, see the
+file itself): zero-angle identities for both $C_{L,\text{vortex}}$ and
+$C_{L,\text{total}}$; the additive identity
+$C_{L,\text{total}}=C_{L,\text{attached}}+C_{L,\text{vortex}}$; an
+independent hand-formula cross-check; non-negativity and monotonic,
+$\alpha^2$-consistent nonlinear growth over the study range; vortex-fraction
+behavior at low vs. moderate $\alpha$; monotonic sweep and $K_v$
+sensitivity (including an exact linear-scaling identity in $K_v$); absence
+of NaN/Inf over the full sweep $\times$ $\alpha$ study grid; scalar/array
+consistency; invalid-input rejection (non-finite $\alpha$, sweep outside
+$(0°,90°)$, non-positive $K_v$); a hard-coded regression check that the M1
+attached-flow numbers are byte-for-byte unchanged; degree/radian
+consistency; and the analytical maximum-location identity from §9.6.
+`scripts/vortex_lift_study.py` additionally reconstructs one $C_{L,\text{total}}$
+value directly from the documented formulas by hand; the residual in the
+current run is exactly `0.0`.
+
+### 9.9 Assumptions and limitations (Milestone 2)
+
+- $K_{v,\text{ref}}=3.30$ is illustrative, not derived or calibrated.
+- The sweep law $K_v\propto1/\cos\Lambda_{LE}$ holds the
+  $(K_p - K_p^2K_i)$ prefactor fixed; the prefactor's own (weak) planform
+  dependence per Polhamus's fig. 9 is not reproduced.
+- The vortex term is combined with this project's linear M1 baseline rather
+  than with Polhamus's own nonlinear potential term (§9.4) — a deliberate
+  milestone-preserving simplification.
+- No vortex breakdown, no stall, no maximum-$C_L$ cutoff; the model and all
+  figures/tables are restricted to and only claimed valid over
+  $\alpha\in[0°,25°]$.
+- No drag, pitching moment, stability, or supersonic effects are treated —
+  out of scope for this milestone, as for Milestone 1.
+- No experimental or CFD validation is performed in this project; agreement
+  cited from Polhamus's own paper (§9.1) describes *his* validation of the
+  full original theory, not a validation of this project's simplified
+  reduced-order variant.
+
+## 10. Known limitations (Milestone 1)
 
 - The attached-flow model is a classical, moderate/high-AR lifting-line
   result; its assumptions are known to be violated by this low-AR,
