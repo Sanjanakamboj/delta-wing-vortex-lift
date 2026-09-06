@@ -11,8 +11,6 @@ study.
 
 import math
 
-import numpy as np
-
 from delta_vortex_lift.attached_flow import attached_flow_CL_deg, finite_wing_lift_curve_slope
 from delta_vortex_lift.geometry import representative_geometry
 from delta_vortex_lift.vortex_lift import (

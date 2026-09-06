@@ -1,462 +1,175 @@
-# Portfolio Project 09: Delta Wing Vortex Lift
+# Delta Wing Vortex Lift — Reduced-Order Aerodynamic Study
 
-## Engineering question
+A from-scratch, reduced-order aerodynamic model of a **generic, illustrative
+65° delta wing**, built up in verified stages: classical attached-flow
+lift, Polhamus-style nonlinear vortex lift, drag-due-to-lift and L/D, a
+conceptual vortex-breakdown sensitivity treatment, and a pitching-moment /
+center-of-pressure force-location model. Every equation has an independent
+verification route; every uncertain parameter is explicit and studied via
+sensitivity rather than presented as fact.
 
-> What is a defensible, reduced-order estimate of the lift curve for a
-> generic, highly swept delta wing — separating the classical attached-flow
-> contribution from the nonlinear vortex-lift contribution that dominates
-> delta-wing aerodynamics at moderate-to-high angle of attack?
+**This is a conceptual, reduced-order engineering study — not a validated
+aerodynamic prediction.** It uses no experimental or CFD data, does not
+model a real aircraft, and does not perform a complete-aircraft stability
+analysis. See [Limitations](#limitations) before using any number here for
+anything beyond illustration.
 
-## Current scope: Milestone 1 only
+## Engineering objective
 
-This milestone establishes the **geometry model, aerodynamic conventions, and
-attached-flow baseline** for a generic delta wing.
+> How much does the nonlinear, Polhamus-style leading-edge vortex change
+> the lift, drag, efficiency, and pitching behavior of a highly swept,
+> low-aspect-ratio delta wing relative to classical attached-flow theory —
+> and how much of that picture is robust versus assumption-dependent once
+> vortex breakdown and force-location uncertainty are taken into account?
 
-**Vortex lift is intentionally NOT implemented in this milestone.** It is
-deferred until the attached-flow foundation below is independently verified.
-See [DESIGN.md](DESIGN.md) for the full derivation, source audit, and
-limitations.
+## Final representative geometry
 
-## Representative generic geometry
+A single symmetric, sharp-edged, straight-sided triangular delta wing, used
+throughout and never changed:
 
-A single symmetric, sharp-edged, straight-sided (true triangular) delta wing
-is used throughout, chosen to be clearly illustrative and **not** a
-reconstruction of any real aircraft:
+| $b$ | $c_r$ | $S$ | $AR$ | $\Lambda_{LE}$ | MAC |
+|---:|---:|---:|---:|---:|---:|
+| 6.00 m | 6.4335 m | 19.3006 m² | 1.8652 | 65° | 4.2890 m ($=\tfrac23c_r$) |
 
-| Quantity | Symbol | Value |
-|---|---|---|
-| Root chord | $c_r$ | 6.43 m |
-| Full span | $b$ | 6.00 m |
-| Planform area | $S$ | 19.30 m² |
-| Aspect ratio | $AR = b^2/S$ | 1.87 |
-| Leading-edge sweep | $\Lambda_{LE}$ | 65.0° |
+Chosen as (span, sweep) = (6.0 m, 65°): 65° sits mid-range in the 55–70°
+conceptual band for a slender supersonic-type delta; 6.0 m is a round,
+purely illustrative scale (irrelevant to any $C_L$/$C_D$/$C_m$ result,
+which depend only on dimensionless ratios).
 
-Chosen independent parameters: span $b = 6.0$ m and sweep
-$\Lambda_{LE} = 65°$ (middle of the conceptual 55–70° range for a slender
-supersonic-type delta). All other quantities are derived — see
-[`geometry.py`](src/delta_vortex_lift/geometry.py).
+## Main findings
 
-## Aerodynamic conventions
+1. **Vortex lift adds up to ~30% of total lift** by $\alpha=25°$ for this wing (Polhamus-style, $C_{L,\text{vortex}}=K_v\cos\alpha\sin^2\alpha$).
+2. **Vortex lift does not uniformly improve efficiency** — it raises L/D by ~4% at 5° but *lowers* it by ~15% at 20°, since vortex-induced drag grows faster than the lift benefit.
+3. **Limiting vortex effectiveness above an assumed breakdown onset actually raises L/D at high α** relative to the unbounded extrapolation (+9.7% at 25°) — because it strips away disproportionately drag-heavy lift. This fell out of the model; it was not designed in.
+4. **The conceptual usable-AoA region (0°–10.6°) is bounded by ordinary induced-drag decay, not by the uncertain breakdown assumption** — a genuine robustness result for the low/mid-angle model.
+5. **High-angle pitching-moment conclusions are dominated by the assumed vortex force-location**, not by any other modeled effect: a $\pm0.10c_r$ sensitivity moves $C_m(20°)$ from −0.277 to −0.355.
 
-- $\alpha$: geometric angle of attack [rad internally, deg for I/O and plots].
-  $\alpha = 0$ is the zero-lift orientation of this symmetric conceptual wing.
-  Positive $\alpha$ produces positive lift.
-- $C_L = L / (q_\infty S)$, with $q_\infty = \tfrac{1}{2}\rho_\infty V_\infty^2$.
+See [RESULTS.md](RESULTS.md) for the full quantitative summary and
+[VERIFICATION.md](VERIFICATION.md) for the independent audit behind every
+number.
 
-## Attached-flow baseline equation
+## Model architecture
 
-$$a = \frac{a_0}{1 + a_0/(\pi e\, AR)}, \qquad C_{L,\text{attached}} = a\,\alpha$$
+### Attached-flow baseline
 
-with $a_0 = 2\pi$ /rad (thin-airfoil default) and $e = 0.9$ (declared,
-illustrative span-efficiency factor — **not** calibrated to any real
-aircraft).
+Classical finite-wing lifting-line correction, used as a transparent
+reference — **not** a delta-wing-specific theory:
+$$a = \frac{a_0}{1+a_0/(\pi e AR)}, \quad a_0=2\pi,\ e=0.9 \;\Rightarrow\; a=2.867211\ \text{rad}^{-1}, \qquad C_{L,\text{attached}}=a\alpha$$
 
-**This is a classical, moderate-to-high-AR finite-wing relation used here
-only as a transparent reduced-order reference.** It is explicitly *not* a
-high-fidelity prediction for a highly swept, low-AR delta wing, which
-develops separated leading-edge vortices and a large nonlinear lift
-contribution this formula cannot capture. See [DESIGN.md](DESIGN.md).
+### Vortex lift
 
-## Headline result
+Polhamus's leading-edge-suction analogy (NASA TN D-3767, 1966), eq. (12),
+combined with the *unchanged* linear attached term above (a documented
+simplification of Polhamus's own combined nonlinear formula — see
+[DESIGN.md](DESIGN.md)):
+$$C_{L,\text{vortex}} = K_v(\Lambda_{LE})\cos\alpha\sin^2\alpha, \qquad K_v(\Lambda_{LE}) = K_{v,\text{ref}}\frac{\cos65°}{\cos\Lambda_{LE}},\ K_{v,\text{ref}}=3.30$$
 
-For the representative geometry above ($AR = 1.87$, $e = 0.9$):
+### Drag / L-D
 
-- Attached-flow lift-curve slope: $a \approx 2.867$ /rad ($\approx 0.0500$ /deg)
-- $C_{L,\text{attached}}(\alpha)$: $0$ at $0°$, $\approx 0.250$ at $5°$,
-  $\approx 0.500$ at $10°$, $\approx 0.751$ at $15°$
+Hybrid: classical induced drag for the attached term, Polhamus's (NASA TN
+D-4739, 1968) normal-force resolution applied to the vortex term only:
+$$C_{Di,\text{attached}}=\frac{C_{L,\text{attached}}^2}{\pi e AR}, \quad C_{D,\text{vortex}}=C_{L,\text{vortex}}\tan\alpha, \quad C_{D,\text{total}}=C_{D0}+C_{Di,\text{attached}}+C_{D,\text{vortex}},\ C_{D0}=0.028$$
 
-Reproduce with:
+### Breakdown sensitivity
+
+**Not a breakdown prediction.** A smooth, assumed effectiveness factor
+multiplies the vortex lift term only, motivated qualitatively by
+Wentz & Kohlman (1971) and NASA vortex-core literature:
+$$f_b(\alpha) = f_{post}+(1-f_{post})\tfrac12\bigl(1-\tanh(\tfrac{\alpha-\alpha_b}{\Delta\alpha/2})\bigr), \quad \alpha_b=20°,\ \Delta\alpha=4°,\ f_{post}=0.45$$
+$$C_{L,\text{vortex,eff}} = C_{L,\text{vortex}}\cdot f_b(\alpha)$$
+
+### Pitching moment / center of pressure
+
+**Isolated-wing conceptual model only** — no tail, trim, CG, or control
+surfaces. Force-location convention derived, not guessed (force aft of
+reference ⇒ nose-down):
+$$C_m = -C_L\frac{\hat x_{\text{force}}-\hat x_{ref}}{\hat c_{ref}}, \qquad \hat x_{cp}=\frac{C_{L,\text{attached}}\hat x_{attached}+C_{L,\text{vortex,eff}}\hat x_{vortex}}{C_{L,\text{total}}}$$
+Nominal: $\hat x_{attached}=\hat x_{vortex}=2/3$ (Jones 1946 slender-wing
+theory; Snyder & Lamar 1972's AR≤2 similar-centroid finding), $\hat
+x_{ref}=0.5$, $\hat c_{ref}=$MAC$/c_r=2/3$ (matching NASA TN D-6994's own
+convention exactly).
+
+## Conceptual study region
+
+A predeclared rule (fixed *before* computing the result): usable iff
+$f_b\ge0.9$ AND post-peak $L/D\ge0.9\times$ the pre-breakdown reference
+L/D AND $\alpha\le25°$. **Result: $[0°,10.6°]$**, unchanged across
+$\alpha_b\in\{17°,20°,23°\}$ — ordinary drag-driven L/D decay binds first,
+not the breakdown assumption. This is a **predeclared-rule construct**,
+never a "safe flight envelope," "stall boundary," or "certified AoA limit."
+
+## Verification
+
+Every equation has an independent test-side or hand-calculation
+verification route. Milestone 6 performed a **fresh, independent, 82-check
+audit** of the entire model (raw formulas, not production-code
+self-comparison); maximum residual **5.4e-13** (a numerical-integration
+check — every closed-form check was exact). See
+[VERIFICATION.md](VERIFICATION.md) for the full table. **208 tests pass**
+under `pytest -W error -q`.
+
+## Featured figures
+
+- [`figures/final_delta_wing_summary.png`](figures/final_delta_wing_summary.png) — single-page 4-panel summary (geometry, lift, L/D, load movement).
+- [`figures/final_lift_decomposition.png`](figures/final_lift_decomposition.png) — attached / vortex / pre-breakdown / breakdown-limited lift.
+- [`figures/final_aerodynamic_trade.png`](figures/final_aerodynamic_trade.png) — $C_L$/$C_D$/$L/D$, attached-only vs. attached+vortex.
+- [`figures/final_load_movement.png`](figures/final_load_movement.png) — center-of-pressure and pitching-moment sensitivity.
+
+20 figures total across all milestones live in `figures/` — see
+[Repository structure](#repository-structure).
+
+## Limitations
+
+- **Generic, illustrative geometry** — not a reconstruction of any real aircraft.
+- **Incompressible, classical lifting-line attached-flow baseline** — not a delta-wing-specific theory, and known to be physically incomplete once the leading-edge vortex forms.
+- **Illustrative $K_v$ sweep scaling** — not recomputed from Multhopp lifting-surface theory, not fitted to experimental data.
+- **Hybrid drag model** — documented departure from Polhamus's own combined drag-due-to-lift formula.
+- **Assumed breakdown parameters** ($\alpha_b$, $\Delta\alpha$, $f_{post}$) — explicit sensitivity inputs, not validated predictions for this wing.
+- **Conceptual pitching-moment force locations** — source-motivated but not calibrated to this specific geometry.
+- **No CFD or experimental validation anywhere in this project.**
+- **No complete-aircraft longitudinal-stability, trim, or control-surface analysis.**
+- **No compressibility or Reynolds-number corrections.**
+
+## Reproducing the analysis
 
 ```bash
+pip install -e ".[dev]"
+pytest -W error -q
+
 python scripts/manual_check.py
-```
-
-## Figures
-
-- [`figures/delta_wing_geometry.png`](figures/delta_wing_geometry.png) —
-  planform sketch: span, root chord, leading-edge sweep, generic/illustrative.
-- [`figures/attached_flow_lift.png`](figures/attached_flow_lift.png) —
-  $C_{L,\text{attached}}$ vs. $\alpha$, clearly labeled as an attached-flow
-  baseline with no vortex-lift or total-lift curve.
-
-Regenerate with:
-
-```bash
-python scripts/make_geometry_figure.py
-python scripts/make_attached_lift_figure.py
-```
-
-## Verification status
-
-- 42 automated tests pass under `pytest -W error -q` (geometry identities,
-  attached-flow identities, invalid-input rejection, scalar/array
-  consistency, radians/degrees consistency).
-- `scripts/manual_check.py` independently reconstructs one $C_L$ value
-  directly from the documented formula; residual is exactly 0.
-- See [DESIGN.md](DESIGN.md) for the full list of verification identities.
-
-## Limitations (read before use)
-
-- The attached-flow model is a classical finite-wing lifting-line
-  correction; it is **not** a delta-wing-specific theory and is known to be
-  physically incomplete for this geometry once leading-edge vortices form.
-- No sweep correction, stall model, or vortex-lift term is included in this
-  milestone.
-- The linear baseline is plotted from −5° to +20° for comparison purposes
-  only; the region beyond a conceptual small-angle guide (≈8°) is explicitly
-  marked as extrapolation, not a validated prediction.
-- $e = 0.9$ is a stated, illustrative value, not a calibrated one.
-- No experimental or CFD validation data is used or implied anywhere in this
-  milestone.
-
-## Milestone 2: Polhamus-style vortex-lift contribution
-
-### Engineering question
-
-> How much additional, nonlinear lift does the leading-edge vortex
-> contribute beyond the attached-flow baseline, and how sensitive is that
-> contribution to leading-edge sweep and to the chosen model coefficient?
-
-### Model equation
-
-The Milestone 1 attached-flow baseline is kept **unchanged**:
-$C_{L,\text{attached}}(\alpha) = a\,\alpha$.
-
-A separate, reduced-order **Polhamus-style** vortex-lift term is added:
-
-$$C_{L,\text{vortex}}(\alpha, \Lambda_{LE}) = K_v(\Lambda_{LE})\,\cos\alpha\,\sin^2\alpha,
-\qquad K_v(\Lambda_{LE}) = K_{v,\text{ref}}\,\frac{\cos\Lambda_{LE,\text{ref}}}{\cos\Lambda_{LE}}$$
-
-$$C_{L,\text{total}}(\alpha) = C_{L,\text{attached}}(\alpha) + C_{L,\text{vortex}}(\alpha,\Lambda_{LE})$$
-
-with $K_{v,\text{ref}} = 3.30$ (illustrative, at $\Lambda_{LE,\text{ref}} = 65°$).
-See [DESIGN.md](DESIGN.md) for exactly what is and is not adopted from the
-original theory — **this is a Polhamus-inspired reduced-order model, not the
-full validated Polhamus prediction.**
-
-### Source
-
-E. C. Polhamus, *A Concept of the Vortex Lift of Sharp-Edge Delta Wings
-Based on a Leading-Edge-Suction Analogy*, NASA TN D-3767, 1966
-(<https://ntrs.nasa.gov/citations/19670003842>). The functional form
-$C_{L,v} = K_v\cos\alpha\sin^2\alpha$ is his eq. (12); the sweep scaling
-$K_v \propto 1/\cos\Lambda_{LE}$ is derived from his eq. (13).
-
-### Representative results ($\Lambda_{LE}=65°$, $AR=1.87$, $e=0.9$, $K_v=3.30$)
-
-| $\alpha$ [deg] | $C_{L,\text{attached}}$ | $C_{L,\text{vortex}}$ | $C_{L,\text{total}}$ | $f_v$ [%] |
-|---:|---:|---:|---:|---:|
-| 0 | 0.0000 | 0.0000 | 0.0000 | 0.00 |
-| 5 | 0.2502 | 0.0250 | 0.2752 | 9.07 |
-| 10 | 0.5004 | 0.0980 | 0.5984 | 16.38 |
-| 15 | 0.7506 | 0.2135 | 0.9642 | 22.15 |
-| 20 | 1.0008 | 0.3627 | 1.3636 | 26.60 |
-
-Vortex-lift increment vs. attached-only: at $\alpha=10°$, $\Delta C_L =
-0.0980$ (+19.6%); at $\alpha=15°$, $\Delta C_L = 0.2135$ (+28.4%); at
-$\alpha=20°$, $\Delta C_L = 0.3627$ (+36.2%).
-
-Reproduce with:
-
-```bash
 python scripts/vortex_lift_study.py
-```
-
-### Figures
-
-- [`figures/vortex_lift_decomposition.png`](figures/vortex_lift_decomposition.png)
-  — attached, vortex, and total $C_L$ vs. $\alpha$.
-- [`figures/vortex_lift_sensitivity.png`](figures/vortex_lift_sensitivity.png)
-  — (a) sweep sensitivity ($\Lambda_{LE}=55°,65°,75°$), (b) vortex-lift
-  fraction vs. $\alpha$ with $\pm20\%$ $K_v$ sensitivity.
-
-Regenerate with:
-
-```bash
-python scripts/make_vortex_decomposition_figure.py
-python scripts/make_vortex_sensitivity_figure.py
-```
-
-### Limitations
-
-- $K_{v,\text{ref}} = 3.30$ is an explicit, illustrative constant chosen
-  within the numerical range Polhamus himself reports (~3.14–3.45); it is
-  **not** recomputed from Multhopp lifting-surface theory and **not**
-  fitted to any experimental dataset.
-- The sweep scaling holds the planform-dependent prefactor in Polhamus's
-  eq. (13) fixed at its reference value — a documented simplification, not
-  a full re-derivation.
-- The vortex term is added to this project's *linear* M1 attached-flow
-  baseline, not to Polhamus's own nonlinear potential term
-  ($K_p\sin\alpha\cos^2\alpha$) — see [DESIGN.md](DESIGN.md) for why.
-- No vortex breakdown or stall model is included; curves are only claimed
-  valid over the plotted $\alpha \in [0°, 25°]$ range and must not be
-  extrapolated.
-- No experimental or CFD validation is used or implied.
-
-## Milestone 3: drag due to lift and aerodynamic efficiency
-
-### Engineering question
-
-> How much drag does the leading-edge vortex cost, and does the extra lift
-> it provides actually improve (or degrade) the wing's lift-to-drag ratio
-> across the conceptual angle-of-attack range?
-
-### Drag decomposition equations
-
-$$C_{Di,\text{attached}}(\alpha) = \frac{C_{L,\text{attached}}(\alpha)^2}{\pi e\,AR} \qquad \text{(classical lifting-line induced drag, unchanged } e, AR\text{ from M1)}$$
-
-$$C_{D,\text{vortex}}(\alpha,\Lambda_{LE}) = C_{L,\text{vortex}}(\alpha,\Lambda_{LE})\,\tan\alpha \qquad \text{(Polhamus-style, applied to the vortex term only)}$$
-
-$$C_{D,\text{total}}(\alpha) = C_{D0} + C_{Di,\text{attached}}(\alpha) + C_{D,\text{vortex}}(\alpha,\Lambda_{LE}), \qquad L/D = \frac{C_{L,\text{total}}}{C_{D,\text{total}}}$$
-
-with $C_{D0} = 0.028$: an explicit, **illustrative, uncalibrated**
-zero-lift/profile-drag constant. This is a **hybrid, reduced-order,
-Polhamus-inspired** model — not Polhamus's own combined drag formula. See
-[DESIGN.md](DESIGN.md) for exactly why and what is simplified.
-
-### Sources
-
-- E. C. Polhamus, *Application of the Leading-Edge-Suction Analogy of
-  Vortex Lift to the Drag Due to Lift of Sharp-Edge Delta Wings*, NASA TN
-  D-4739, 1968 — his eq. (4), $\Delta C_D = C_L\tan\alpha$, is the
-  geometric basis for $C_{D,\text{vortex}}$ here.
-- Classical Prandtl lifting-line induced drag (e.g. Anderson, *Fundamentals
-  of Aerodynamics*) for $C_{Di,\text{attached}}$, consistent with M1's own
-  $(e, AR)$.
-
-### Representative results ($\Lambda_{LE}=65°$, $C_{D0}=0.028$)
-
-| $\alpha$ | $C_{L,\text{total}}$ | $C_{D,\text{total}}$ | $L/D$ |
-|---:|---:|---:|---:|
-| 10° | 0.5984 | 0.0928 | 6.45 |
-| 15° | 0.9642 | 0.1921 | 5.02 |
-| 20° | 1.3636 | 0.3500 | 3.90 |
-
-### Attached-only vs. attached+vortex — key finding
-
-| $\alpha$ | $L/D$ (attached-only) | $L/D$ (attached+vortex) | % change |
-|---:|---:|---:|---:|
-| 5° | 6.276 | 6.543 | **+4.3%** |
-| 10° | 6.630 | 6.451 | **−2.7%** |
-| 15° | 5.567 | 5.020 | **−9.8%** |
-| 20° | 4.592 | 3.896 | **−15.2%** |
-
-**Vortex lift does not uniformly improve efficiency.** It gives a small L/D
-benefit near $\alpha=5°$, but the vortex-drag penalty grows faster than the
-extra lift as $\alpha$ increases, so L/D is *lower* with vortex lift included
-at 10° and beyond. Best sampled L/D within $\alpha\in[0°,25°]$: **6.86 at
-7.7°** (attached-only) vs. **6.97 at 7.0°** (attached+vortex) — both figures
-are grid-search results within the declared range, not claimed aerodynamic
-optima.
-
-### Sensitivity
-
-Best sampled L/D is fairly sensitive to the illustrative $C_{D0}$: 8.23
-($C_{D0}=0.02$) → 6.74 ($C_{D0}=0.03$) → 5.85 ($C_{D0}=0.04$). It is much
-less sensitive to $\pm20\%$ on $K_v$ (6.95–7.00).
-
-### Figures
-
-- [`figures/drag_decomposition.png`](figures/drag_decomposition.png) — $C_{D0}$, $C_{Di,\text{attached}}$, $C_{D,\text{vortex}}$, $C_{D,\text{total}}$ vs. $\alpha$.
-- [`figures/lift_drag_polar.png`](figures/lift_drag_polar.png) — $C_L$ vs. $C_D$ for both models, with $\alpha$-labeled points.
-- [`figures/lift_to_drag_ratio.png`](figures/lift_to_drag_ratio.png) — $L/D$ vs. $\alpha$ for both models, best-sampled points marked.
-- [`figures/drag_sensitivity.png`](figures/drag_sensitivity.png) — $L/D$ vs. $\alpha$ across $C_{D0}$ values, and best sampled $L/D$ vs. $C_{D0}$.
-
-Reproduce with:
-
-```bash
 python scripts/drag_polar_study.py
-python scripts/make_drag_decomposition_figure.py
-python scripts/make_lift_drag_polar_figure.py
-python scripts/make_lift_to_drag_ratio_figure.py
-python scripts/make_drag_sensitivity_figure.py
-```
-
-### Limitations
-
-- $C_{D0}=0.028$ is illustrative and uncalibrated — not fit to any real
-  aircraft or dataset; it represents skin-friction/form/interference drag
-  entirely outside this lift-based model.
-- $C_{D,\text{vortex}}$ resolves only the vortex-lift force via
-  $\tan\alpha$; the attached term instead uses classical induced drag —
-  this is a documented hybrid, not Polhamus's own combined formula (which
-  resolves the *total* zero-suction lift via $\tan\alpha$).
-- No stall, vortex breakdown, or drag-rise model; all results are only
-  claimed valid over $\alpha\in[0°,25°]$ and must not be extrapolated.
-- "Best sampled L/D" values are grid-search maxima over the declared
-  range, not claimed aerodynamic optima.
-- No experimental or CFD validation is used or implied.
-
-## Milestone 4: vortex-breakdown / lift-limit sensitivity and usable-AoA envelope
-
-### Engineering question
-
-> The M2/M3 Polhamus-style model extrapolates vortex lift indefinitely.
-> Real leading-edge vortices eventually break down. Without geometry/Re/
-> Mach-specific data to predict exactly when, how much does that
-> uncertainty change the lift, drag, and L/D picture — and what is a
-> transparent, conceptual "usable" angle-of-attack region given that
-> uncertainty?
-
-### Why M2/M3 need a high-angle validity treatment
-
-Nothing in the Polhamus (1966/1968) lift/drag algebra used in M2/M3
-predicts vortex breakdown — both reports explicitly assume the leading-edge
-vortex remains intact and reattaches on the upper surface. Left unchecked,
-M2/M3 extrapolate that assumption indefinitely, which is not defensible at
-higher angles of attack.
-
-### Source audit
-
-- W. H. Wentz and D. L. Kohlman, *Vortex Breakdown on Slender Sharp-Edged
-  Wings*, Journal of Aircraft, Vol. 8, No. 3, 1971 (Univ. of Kansas study,
-  NASA CR-98737, 1969): systematic schlieren study across sweep 45°–85°
-  showing breakdown location moves forward with α, is delayed by higher
-  sweep, and becomes sweep-independent above ~75°.
-- K. D. Visser and R. C. Nelson, NASA/NTRS 19910014797: identifies the
-  vortex core's own circulation/pressure field (not trailing-edge
-  separation) as the driver of breakdown onset — a distinct mechanism from
-  2-D boundary-layer stall.
-- These sources establish: (1) breakdown is physically distinct from
-  ordinary stall, (2) onset depends strongly on sweep/planform and α, (3)
-  this project has no validated data for its own generic wing, so (4) M4 is
-  a **sensitivity model, not a breakdown prediction**.
-
-### Breakdown-effectiveness equation
-
-$$f_b(\alpha) = f_{post} + (1-f_{post})\cdot\tfrac12\bigl(1-\tanh(\tfrac{\alpha-\alpha_b}{w})\bigr), \quad w=\tfrac{\Delta\alpha}{2}$$
-$$C_{L,\text{vortex,effective}} = C_{L,\text{vortex,pre}}\cdot f_b(\alpha), \qquad C_{D,\text{vortex,effective}} = C_{L,\text{vortex,effective}}\tan\alpha$$
-
-M1's attached term and M3's $C_{Di,\text{attached}}$/$C_{D0}$ are **unchanged**.
-
-### Default assumptions (illustrative, not predictions)
-
-$\alpha_b = 20°$, $\Delta\alpha = 4°$, $f_{post} = 0.45$ — qualitatively motivated by the sweep/α trends above, not a quantitative fit to any dataset for this wing.
-
-### Sensitivity cases
-
-$\alpha_b \in \{17°, 20°, 23°\}$ (fixed $\Delta\alpha$, $f_{post}$); $\Delta\alpha \in \{3°, 4°, 5°\}$ (fixed $\alpha_b$, $f_{post}$).
-
-### Predeclared conceptual usable-AoA rule
-
-Declared *before* computing the result: usable iff (a) $f_b \ge 0.9$, (b) past its own peak, breakdown-limited $L/D \ge 0.9\times$ the pre-breakdown (M3) reference L/D, (c) $\alpha \le 25°$ (original M1–M3 domain).
-
-### Representative results (default case, $\Lambda_{LE}=65°$)
-
-| $\alpha$ | $f_b$ | $C_{L,\text{total}}$ | $C_{D,\text{total}}$ | $L/D$ |
-|---:|---:|---:|---:|---:|
-| 15° | 0.996 | 0.963 | 0.192 | 5.02 |
-| 20° | 0.725 | 1.264 | 0.314 | 4.03 |
-| 25° | 0.454 | 1.493 | 0.438 | 3.41 |
-| 30° | 0.450 | 1.823 | 0.641 | 2.84 |
-
-### Key finding
-
-At α=25°, breakdown-limited $C_{L,\text{total}}$ is **16.4% lower** than the unbounded M2/M3 extrapolation (1.493 vs. 1.785) — but breakdown-limited **L/D is 9.7% higher** (3.41 vs. 3.11), because stripping away disproportionately drag-heavy vortex lift removes more drag than lift. **The resulting usable-AoA upper edge (10.6°) is identical across all three onset cases** — the binding constraint is ordinary induced-drag-driven L/D decay (already present in M3), not the vortex-breakdown assumption itself. The low/mid-angle Polhamus-style model is robust to this new limiter; only the high-angle picture is assumption-dependent.
-
-### Figures
-
-- [`figures/vortex_breakdown_effectiveness.png`](figures/vortex_breakdown_effectiveness.png) — $f_b(\alpha)$ for all onset cases.
-- [`figures/lift_with_breakdown.png`](figures/lift_with_breakdown.png) — attached-only, unbounded M2/M3, and breakdown-limited lift.
-- [`figures/lift_to_drag_with_breakdown.png`](figures/lift_to_drag_with_breakdown.png) — L/D comparison, best-sampled points marked.
-- [`figures/usable_alpha_region.png`](figures/usable_alpha_region.png) — normalized $f_b$ and L/D with the shaded conceptual usable region.
-
-Reproduce with:
-
-```bash
 python scripts/breakdown_study.py
-python scripts/make_breakdown_effectiveness_figure.py
-python scripts/make_lift_with_breakdown_figure.py
-python scripts/make_lift_to_drag_with_breakdown_figure.py
-python scripts/make_usable_alpha_region_figure.py
-```
-
-### Limitations
-
-- $\alpha_b$, $\Delta\alpha$, $f_{post}$ are explicit, illustrative sensitivity parameters — never validated breakdown predictions for this project's generic wing.
-- The 25–30° extension is used only for this sensitivity study; M1–M3 comparisons remain on their original 0–25° domain.
-- "Usable-AoA region" is a predeclared-rule construct, never a "safe flight envelope," "stall boundary," or "certified AoA limit."
-- No experimental or CFD validation is used or implied.
-
-## Milestone 5: pitching moment, aerodynamic center, and static longitudinal tendencies
-
-### Engineering question
-
-> How does the nonlinear vortex-lift contribution alter the center of
-> pressure and pitching moment of this generic delta wing as angle of
-> attack increases? **This is an isolated-wing conceptual study only** —
-> no tail, elevator, trim solution, CG model, or dynamic-stability
-> derivative is included, and results must never be read as a complete-
-> aircraft stability analysis.
-
-### Moment convention (derived, not guessed)
-
-$x$ positive aft from the apex; lift positive up. A force **aft** of the
-reference point produces a **nose-down** (negative) moment; a force
-**forward** of it produces nose-up (positive):
-
-$$C_m = -C_L\,\frac{x_{\text{force}} - x_{\text{ref}}}{c_{\text{ref}}}, \qquad C_{m,\text{total}} = C_{m0} + C_{m,\text{attached}} + C_{m,\text{vortex}}$$
-
-### Force-location model and MAC
-
-$$\text{MAC} = \tfrac{2}{3}c_r \;(\text{independently derived \& verified}), \quad x_{ref}/c_r = 0.50, \quad x_{attached}/c_r = x_{vortex}/c_r = \tfrac{2}{3}\;(\text{nominal}), \quad C_{m0}=0$$
-
-- $x_{attached}/c_r = 2/3$: derived from R. T. Jones' (1946) slender-wing sectional-loading principle via direct integration (not asserted from memory — see DESIGN.md for the calculus).
-- $x_{vortex}/c_r$ nominal **equal to** $x_{attached}$: directly motivated by Snyder & Lamar (NASA TN D-6994, 1972), who find the potential-flow and vortex-lift chordwise load distributions have similar shape/centroid for delta wings with $AR\le2$ — our wing's $AR=1.87$ qualifies.
-- $x_{ref}/c_r=0.5$ and $c_{ref}=$ MAC match the NASA TN D-6994 moment convention exactly.
-
-Because the nominal model co-locates the two force resultants, $x_{cp}/c_r$ is **identically 2/3 for every α** in the nominal case — any center-of-pressure movement shown below isolates the effect of an explicit $x_{vortex}$ **offset**, studied as a dedicated sensitivity (±0.10c_r), not a validated value.
-
-### Representative results (nominal, $\Lambda_{LE}=65°$)
-
-| α | $f_v$ | $C_{m,\text{total}}$ |
-|---:|---:|---:|
-| 10° | 16.4% | −0.1496 |
-| 15° | 22.1% | −0.2408 |
-| 20° | 20.8% | −0.3160 |
-| 25° | 16.2% | −0.3734 |
-
-At the $x_{vortex}/c_r=2/3-0.10$ sensitivity case, $x_{cp}/c_r$ moves **forward** from 0.667 to ≈0.643 as $\alpha$ rises to ~17°, then **recovers aft** toward $x_{attached}$ as M4 vortex breakdown reduces the vortex contribution's weight — a direct, honest consequence of the M4 effectiveness factor used exactly (not reimplemented).
-
-### Sensitivity
-
-Best-sampled $C_{m,\text{total}}$ at α=25° ranges from −0.337 to −0.410 across $x_{vortex}/c_r=2/3\mp0.10$ — the force-location assumption dominates the uncertainty, far more than any numerical-solver precision.
-
-### Figures
-
-- [`figures/center_of_pressure_vs_alpha.png`](figures/center_of_pressure_vs_alpha.png)
-- [`figures/pitching_moment_decomposition.png`](figures/pitching_moment_decomposition.png)
-- [`figures/pitching_moment_sensitivity.png`](figures/pitching_moment_sensitivity.png)
-- [`figures/delta_wing_force_locations.png`](figures/delta_wing_force_locations.png)
-
-Reproduce with:
-
-```bash
 python scripts/pitching_moment_study.py
-python scripts/make_center_of_pressure_figure.py
-python scripts/make_pitching_moment_decomposition_figure.py
-python scripts/make_pitching_moment_sensitivity_figure.py
-python scripts/make_force_locations_figure.py
 ```
 
-### Limitations
+Regenerate any figure with its `scripts/make_*.py` script; all figure
+generation is deterministic (byte-identical output on rerun).
 
-- Isolated-wing static pitching tendency only — never "aircraft longitudinal stability."
-- $x_{vortex}/c_r$ is an explicit, illustrative sensitivity parameter, not a validated location.
-- Uses the unchanged M4 effective vortex lift; no separate breakdown multiplier for moment.
-- No experimental or CFD validation is used or implied.
+## Repository structure
 
-## Roadmap
+```
+src/delta_vortex_lift/   geometry, attached_flow, vortex_lift, drag, breakdown, pitching_moment
+tests/                   independent pytest suite (208 tests)
+scripts/                 manual_check.py, *_study.py, make_*.py figure generators
+figures/                 20 deterministic PNGs (per-milestone + 4 final summary figures)
+README.md                this file — engineering story and reproduction guide
+RESULTS.md               concise, interview-ready quantitative summary
+VERIFICATION.md          fresh independent audit and residuals (Milestone 6)
+DESIGN.md                full derivations, source audit, conventions, and per-milestone rationale
+```
 
-- **Milestone 1:** geometry, conventions, attached-flow baseline. ✅
-- **Milestone 2:** Polhamus-style reduced-order vortex-lift contribution. ✅
-- **Milestone 3:** reduced-order drag-due-to-lift, polar, and L/D. ✅
-- **Milestone 4:** conceptual vortex-breakdown/lift-limit sensitivity model
-  and predeclared usable-AoA region. ✅
-- **Milestone 5:** conceptual pitching-moment / center-of-pressure model
-  with a source-motivated force-location sensitivity study. ✅
-- **Milestone 6 (not started):** out of scope for now — no trim, control
-  surfaces, full-aircraft longitudinal stability, dynamic-stability
-  derivatives, CFD, real-aircraft matching, or structural analysis has
-  been implemented.
+## Development history
+
+Built incrementally across six verified milestones, each committed and
+pushed separately with its own test suite and figures:
+
+1. **Geometry & attached-flow baseline** — triangular planform, classical lifting-line reference.
+2. **Polhamus-style vortex lift** — NASA TN D-3767 (1966), sweep sensitivity.
+3. **Drag, polar, and L/D** — NASA TN D-4739 (1968), attached-only vs. vortex-inclusive comparison.
+4. **Vortex-breakdown sensitivity** — Wentz & Kohlman (1971), predeclared usable-AoA rule.
+5. **Pitching moment / center of pressure** — Jones (1946), Snyder & Lamar (1972).
+6. **Final audit, synthesis, and portfolio release** — fresh independent re-verification, final documentation and figures (this milestone; development stops here).
+
+Full derivations, the complete source audit, and per-milestone design
+rationale are in [DESIGN.md](DESIGN.md).

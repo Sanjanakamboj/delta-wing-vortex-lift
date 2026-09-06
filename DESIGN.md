@@ -1070,3 +1070,104 @@ $x_{ref}$ sensitivity is never called a "CG envelope."
   calibrated against any specific planform or experimental dataset.
 - No experimental validation data is used, referenced numerically, or
   implied by any figure in this milestone.
+
+## 14. Milestone 6 — final independent audit and scope closure
+
+### 14.1 What was independently recomputed
+
+As the final milestone, every equation in the model was recomputed from
+raw formulas — written independently of the production code path, not by
+calling the function under audit to generate its own expected value — and
+compared against the live `delta_vortex_lift` modules:
+
+- **Geometry** (§2): $c_r$, $S$, $AR$, $\Lambda_{LE}$, the inverse
+  span-from-$(c_r,\Lambda_{LE})$ construction, MAC (both the closed-form
+  $(2/3)c_r$ result and a fresh high-resolution — 2,000,001-point —
+  numerical quadrature of $(2/S)\int c(y)^2dy$), and the MAC leading-edge
+  $x$-location (confirmed to remain a distinct quantity from MAC length
+  throughout).
+- **Attached flow** (§4): the lift-curve slope formula, $C_L(0)=0$,
+  antisymmetry, and $C_{L,\text{attached}}$ at 5°/10°/15°.
+- **Vortex lift** (§9): $C_{L,\text{vortex}}=K_v\cos\alpha\sin^2\alpha$ and
+  the $K_v(\Lambda_{LE})$ sweep scaling, at 5°/10°/15°/20°/25°, including
+  vortex fraction and percentage lift increment at each point.
+- **Drag/L-D** (§10): $C_{Di,\text{attached}}$, $C_{D,\text{vortex}}$,
+  additive closure, and the $L/D$ identity at 5°/10°/15°/20°/25°, plus a
+  fresh best-sampled-$L/D$ grid search for both the attached-only and
+  attached+vortex models.
+- **Breakdown** (§11): $f_b(\alpha)$ at low angle (confirming $\to1$),
+  high angle (confirming $\to f_{post}$), and at 15°/20°/25°/30°, together
+  with the unbounded-vs-limited $C_L$/$C_D$/$L/D$ difference at each point.
+- **Pitching moment/center of pressure** (§12): $C_{m,\text{attached}}$,
+  $C_{m,\text{vortex}}$, $C_{m,\text{total}}$, $\hat x_{cp}$, and the
+  $C_m$-from-$\hat x_{cp}$ reconstruction identity at 10°/15°/20°/25°.
+- **Sensitivity synthesis**: one-factor-at-a-time sweeps of $\Lambda_{LE}$
+  (M2), $C_{D0}$ (M3), $\alpha_b$ (M4), and $\hat x_{vortex}$ (M5) against
+  headline outputs $C_{L,\text{total}}(20°)$, $L/D(15°)$, and
+  $C_{m,\text{total}}(20°)$ — deterministic, not a fabricated probabilistic
+  interval.
+- **Conceptual study region** (M4's rule, unchanged): recomputed fresh for
+  all three onset sensitivity cases.
+
+### 14.2 Residuals obtained
+
+Across 82 independent fresh checks, the **maximum residual was 5.4e-13**
+(the MAC numerical-quadrature check); every closed-form check matched to
+exactly `0.000e+00`. Full numeric detail is in
+[VERIFICATION.md](VERIFICATION.md), generated from this same audit run.
+
+### 14.3 Defects found
+
+**None.** No M1–M5 equation, sign convention, or headline number required
+correction as a result of this audit. The conceptual study region was
+reconfirmed at $[0°,10.6°]$ — unchanged from the M4 checkpoint — with the
+same binding criterion (ordinary induced-drag L/D decay, not the
+breakdown assumption) reconfirmed by fresh computation rather than assumed
+from prior documentation.
+
+### 14.4 Source bibliographic check
+
+All five source families cited across this project were re-checked for
+title/author/year accuracy and equation/convention consistency with how
+they are used here:
+
+- E. C. Polhamus, *A Concept of the Vortex Lift of Sharp-Edge Delta Wings
+  Based on a Leading-Edge-Suction Analogy*, NASA TN D-3767, 1966 — title,
+  author, and year confirmed against the primary PDF read directly in §5/§9.
+- E. C. Polhamus, *Application of the Leading-Edge-Suction Analogy of
+  Vortex Lift to the Drag Due to Lift of Sharp-Edge Delta Wings*, NASA TN
+  D-4739, 1968 — confirmed against the primary PDF read directly in §10.
+- R. T. Jones, *Properties of Low-Aspect-Ratio Pointed Wings at Speeds
+  Below and Above the Speed of Sound*, NACA Report 835, 1946 — confirmed
+  via publicly available summaries of the report; this project's own use
+  of it is limited to the general slender-wing sectional-loading
+  principle, with the $2/3$-root-chord result independently derived by
+  direct integration (§12.4) rather than quoted from the report.
+- M. H. Snyder, Jr. and J. E. Lamar, *Application of the Leading-Edge-
+  Suction Analogy to Prediction of Longitudinal Load Distribution and
+  Pitching Moments for Sharp-Edged Delta Wings*, NASA TN D-6994, 1972 —
+  confirmed against the primary PDF read directly in §12; the $x_{ref}=c_r/2$
+  and $\bar c=(2/3)c_r$ conventions were re-checked against that PDF and
+  match exactly.
+- W. H. Wentz, Jr. and D. L. Kohlman, *Vortex Breakdown on Slender
+  Sharp-Edged Wings*, Journal of Aircraft, Vol. 8, No. 3, 1971 (based on
+  their University of Kansas study, NASA CR-98737, 1969), and K. D. Visser
+  and R. C. Nelson (NASA/NTRS 19910014797) — both re-checked against the
+  qualitative claims made in §11; no numeric value from either source is
+  used as a validated prediction anywhere in this project (see §11.1–11.2).
+
+No citation or convention error was found; no new references were added,
+consistent with the instruction to prefer existing sources where
+sufficient.
+
+### 14.5 Final scope boundaries
+
+Development stops at the end of Milestone 6. The following remain
+explicitly and permanently out of scope for this project: tail/elevator/
+trim models, complete-aircraft CG/static-margin analysis, dynamic
+stability, control derivatives, CFD, real-aircraft calibration, supersonic
+compressibility corrections, Reynolds-number corrections, structural
+sizing, flight dynamics, performance prediction, optimization, and machine
+learning. See [RESULTS.md](RESULTS.md) and [README.md](README.md) for the
+final synthesized engineering story and [VERIFICATION.md](VERIFICATION.md)
+for the complete audit trail.
