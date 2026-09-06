@@ -379,6 +379,74 @@ python scripts/make_usable_alpha_region_figure.py
 - "Usable-AoA region" is a predeclared-rule construct, never a "safe flight envelope," "stall boundary," or "certified AoA limit."
 - No experimental or CFD validation is used or implied.
 
+## Milestone 5: pitching moment, aerodynamic center, and static longitudinal tendencies
+
+### Engineering question
+
+> How does the nonlinear vortex-lift contribution alter the center of
+> pressure and pitching moment of this generic delta wing as angle of
+> attack increases? **This is an isolated-wing conceptual study only** —
+> no tail, elevator, trim solution, CG model, or dynamic-stability
+> derivative is included, and results must never be read as a complete-
+> aircraft stability analysis.
+
+### Moment convention (derived, not guessed)
+
+$x$ positive aft from the apex; lift positive up. A force **aft** of the
+reference point produces a **nose-down** (negative) moment; a force
+**forward** of it produces nose-up (positive):
+
+$$C_m = -C_L\,\frac{x_{\text{force}} - x_{\text{ref}}}{c_{\text{ref}}}, \qquad C_{m,\text{total}} = C_{m0} + C_{m,\text{attached}} + C_{m,\text{vortex}}$$
+
+### Force-location model and MAC
+
+$$\text{MAC} = \tfrac{2}{3}c_r \;(\text{independently derived \& verified}), \quad x_{ref}/c_r = 0.50, \quad x_{attached}/c_r = x_{vortex}/c_r = \tfrac{2}{3}\;(\text{nominal}), \quad C_{m0}=0$$
+
+- $x_{attached}/c_r = 2/3$: derived from R. T. Jones' (1946) slender-wing sectional-loading principle via direct integration (not asserted from memory — see DESIGN.md for the calculus).
+- $x_{vortex}/c_r$ nominal **equal to** $x_{attached}$: directly motivated by Snyder & Lamar (NASA TN D-6994, 1972), who find the potential-flow and vortex-lift chordwise load distributions have similar shape/centroid for delta wings with $AR\le2$ — our wing's $AR=1.87$ qualifies.
+- $x_{ref}/c_r=0.5$ and $c_{ref}=$ MAC match the NASA TN D-6994 moment convention exactly.
+
+Because the nominal model co-locates the two force resultants, $x_{cp}/c_r$ is **identically 2/3 for every α** in the nominal case — any center-of-pressure movement shown below isolates the effect of an explicit $x_{vortex}$ **offset**, studied as a dedicated sensitivity (±0.10c_r), not a validated value.
+
+### Representative results (nominal, $\Lambda_{LE}=65°$)
+
+| α | $f_v$ | $C_{m,\text{total}}$ |
+|---:|---:|---:|
+| 10° | 16.4% | −0.1496 |
+| 15° | 22.1% | −0.2408 |
+| 20° | 20.8% | −0.3160 |
+| 25° | 16.2% | −0.3734 |
+
+At the $x_{vortex}/c_r=2/3-0.10$ sensitivity case, $x_{cp}/c_r$ moves **forward** from 0.667 to ≈0.643 as $\alpha$ rises to ~17°, then **recovers aft** toward $x_{attached}$ as M4 vortex breakdown reduces the vortex contribution's weight — a direct, honest consequence of the M4 effectiveness factor used exactly (not reimplemented).
+
+### Sensitivity
+
+Best-sampled $C_{m,\text{total}}$ at α=25° ranges from −0.337 to −0.410 across $x_{vortex}/c_r=2/3\mp0.10$ — the force-location assumption dominates the uncertainty, far more than any numerical-solver precision.
+
+### Figures
+
+- [`figures/center_of_pressure_vs_alpha.png`](figures/center_of_pressure_vs_alpha.png)
+- [`figures/pitching_moment_decomposition.png`](figures/pitching_moment_decomposition.png)
+- [`figures/pitching_moment_sensitivity.png`](figures/pitching_moment_sensitivity.png)
+- [`figures/delta_wing_force_locations.png`](figures/delta_wing_force_locations.png)
+
+Reproduce with:
+
+```bash
+python scripts/pitching_moment_study.py
+python scripts/make_center_of_pressure_figure.py
+python scripts/make_pitching_moment_decomposition_figure.py
+python scripts/make_pitching_moment_sensitivity_figure.py
+python scripts/make_force_locations_figure.py
+```
+
+### Limitations
+
+- Isolated-wing static pitching tendency only — never "aircraft longitudinal stability."
+- $x_{vortex}/c_r$ is an explicit, illustrative sensitivity parameter, not a validated location.
+- Uses the unchanged M4 effective vortex lift; no separate breakdown multiplier for moment.
+- No experimental or CFD validation is used or implied.
+
 ## Roadmap
 
 - **Milestone 1:** geometry, conventions, attached-flow baseline. ✅
@@ -386,6 +454,9 @@ python scripts/make_usable_alpha_region_figure.py
 - **Milestone 3:** reduced-order drag-due-to-lift, polar, and L/D. ✅
 - **Milestone 4:** conceptual vortex-breakdown/lift-limit sensitivity model
   and predeclared usable-AoA region. ✅
-- **Milestone 5 (not started):** out of scope for now — no pitching moment,
-  trim, longitudinal stability, control surfaces, CFD comparison, real-
-  aircraft matching, or structural sizing has been implemented.
+- **Milestone 5:** conceptual pitching-moment / center-of-pressure model
+  with a source-motivated force-location sensitivity study. ✅
+- **Milestone 6 (not started):** out of scope for now — no trim, control
+  surfaces, full-aircraft longitudinal stability, dynamic-stability
+  derivatives, CFD, real-aircraft matching, or structural analysis has
+  been implemented.

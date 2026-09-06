@@ -6,6 +6,7 @@ by calling into delta_vortex_lift.geometry to generate their own answers.
 
 import math
 
+import numpy as np
 import pytest
 
 from delta_vortex_lift.geometry import DeltaWingGeometry, representative_geometry
@@ -101,3 +102,70 @@ def test_representative_geometry_is_valid_and_in_conceptual_sweep_range():
     assert wing.aspect_ratio == pytest.approx(expected_AR)
     expected_sweep = math.atan(wing.root_chord / (wing.span / 2.0))
     assert wing.sweep_LE_rad == pytest.approx(expected_sweep)
+
+
+# =======================================================================
+# Milestone 5 additions: MAC helper tests (additive; M1 tests above are
+# unchanged and still pass, confirming no regression).
+# =======================================================================
+
+
+def test_mac_analytical_value():
+    # Independently written expected formula: MAC = (2/3) c_r for taper
+    # ratio 0 (a pure triangle), from the general trapezoidal-wing formula
+    # MAC = (2/3) c_r (1+lambda+lambda^2)/(1+lambda) at lambda=0.
+    wing = DeltaWingGeometry(root_chord=8.0, span=5.0)
+    expected_mac = (2.0 / 3.0) * 8.0
+    assert wing.mean_aerodynamic_chord == pytest.approx(expected_mac)
+
+
+def test_mac_numerical_integration_agreement():
+    # Independent numerical verification of MAC = (2/S) * integral c(y)^2 dy
+    # via the trapezoidal rule, NOT calling mean_aerodynamic_chord to
+    # generate its own expected value.
+    wing = DeltaWingGeometry(root_chord=6.4335, span=6.0)
+    y = np.linspace(0.0, wing.semi_span, 20001)
+    c_of_y = wing.root_chord * (1.0 - y / wing.semi_span)  # independently written c(y)
+    integral = np.trapezoid(c_of_y**2, y)
+    mac_numeric = (2.0 / wing.area) * integral
+    assert mac_numeric == pytest.approx(wing.mean_aerodynamic_chord, rel=1e-6)
+
+
+def test_mac_bounds():
+    wing = representative_geometry()
+    assert 0.0 < wing.mean_aerodynamic_chord < wing.root_chord
+
+
+def test_mac_dimensional_consistency_scales_with_root_chord():
+    # MAC must scale linearly with c_r at fixed taper ratio (0 here).
+    wing_a = DeltaWingGeometry(root_chord=4.0, span=3.0)
+    wing_b = DeltaWingGeometry(root_chord=8.0, span=6.0)  # same sweep, double size
+    assert wing_b.mean_aerodynamic_chord == pytest.approx(2.0 * wing_a.mean_aerodynamic_chord)
+
+
+def test_mac_leading_edge_x_analytical_value():
+    # Independently written: x_LE,MAC = (b/6)*tan(Lambda_LE) at taper ratio 0,
+    # which equals c_r/3 using tan(Lambda_LE) = c_r/(b/2) = 2 c_r/b.
+    wing = DeltaWingGeometry(root_chord=9.0, span=4.0)
+    expected = (wing.span / 6.0) * math.tan(wing.sweep_LE_rad)
+    assert wing.mac_leading_edge_x == pytest.approx(expected)
+    assert wing.mac_leading_edge_x == pytest.approx(wing.root_chord / 3.0)
+
+
+def test_local_chord_matches_linear_taper_and_endpoints():
+    wing = representative_geometry()
+    assert wing.local_chord(0.0) == pytest.approx(wing.root_chord)
+    assert wing.local_chord(wing.semi_span) == pytest.approx(0.0, abs=1e-9)
+    assert wing.local_chord(-wing.semi_span) == pytest.approx(0.0, abs=1e-9)
+    # independent linear-taper formula at a mid-span point
+    y_mid = wing.semi_span / 2.0
+    expected = wing.root_chord * (1.0 - y_mid / wing.semi_span)
+    assert wing.local_chord(y_mid) == pytest.approx(expected)
+
+
+def test_local_chord_rejects_out_of_range_y():
+    wing = representative_geometry()
+    with pytest.raises(ValueError):
+        wing.local_chord(wing.semi_span * 1.5)
+    with pytest.raises(ValueError):
+        wing.local_chord(float("nan"))

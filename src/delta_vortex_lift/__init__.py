@@ -19,8 +19,15 @@ multiplies the unchanged M2 vortex-lift term by a smooth effectiveness
 factor above an assumed, illustrative onset angle, propagates that into the
 M3 drag/L-D model, and defines a predeclared conceptual usable-AoA region.
 See DESIGN.md for the source audit and the exact list of assumptions.
+
+Milestone 5: a conceptual, reduced-order pitching-moment / center-of-
+pressure model (see pitching_moment.py), built on the unchanged M1 attached
+lift and M4 effective vortex lift, with explicit force-location parameters
+and their own sensitivity study. Isolated-wing static pitching tendency
+only -- not a complete-aircraft stability analysis. See DESIGN.md for the
+source audit and exact conventions.
 """
 
-from . import attached_flow, breakdown, drag, geometry, vortex_lift
+from . import attached_flow, breakdown, drag, geometry, pitching_moment, vortex_lift
 
-__all__ = ["geometry", "attached_flow", "vortex_lift", "drag", "breakdown"]
+__all__ = ["geometry", "attached_flow", "vortex_lift", "drag", "breakdown", "pitching_moment"]

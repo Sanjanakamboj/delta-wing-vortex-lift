@@ -89,6 +89,78 @@ class DeltaWingGeometry:
         return math.degrees(self.sweep_LE_rad)
 
     # ------------------------------------------------------------------
+    # Milestone 5 additions: mean aerodynamic chord (MAC) helpers.
+    #
+    # These are ADDITIVE -- they do not change any M1-M4 quantity above.
+    # For this symmetric triangular planform, local chord decreases
+    # linearly from c_r at the centerline (y=0) to 0 at the tip (y=b/2):
+    #
+    #     c(y) = c_r * (1 - 2y/b),   0 <= y <= b/2
+    #
+    # The standard aerodynamic-mean-chord definition is
+    #
+    #     MAC = (2/S) * integral_0^(b/2) c(y)^2 dy
+    #
+    # which for this linear taper (taper ratio 0) integrates in closed form
+    # to MAC = (2/3) c_r -- see :meth:`mean_aerodynamic_chord` docstring for
+    # the derivation and tests/test_geometry.py for an independent numeric
+    # verification of both this formula and the taper-ratio-zero limit of
+    # the general trapezoidal-wing MAC formula.
+    # ------------------------------------------------------------------
+
+    def local_chord(self, y: float) -> float:
+        """Local chord c(y) [m] at spanwise station y in [-b/2, b/2].
+
+        c(y) = c_r * (1 - 2|y|/b), the straight-line taper from c_r at the
+        centerline to 0 at the tip that defines this triangular planform.
+        """
+        if not math.isfinite(y) or abs(y) > self.semi_span + 1.0e-9:
+            raise ValueError(f"y must be finite and within [-b/2, b/2], got {y!r}")
+        return self.root_chord * (1.0 - abs(y) / self.semi_span)
+
+    @property
+    def mean_aerodynamic_chord(self) -> float:
+        """Mean aerodynamic chord MAC [m], MAC = (2/3) * c_r for this planform.
+
+        Derivation: MAC = (2/S) * integral_0^(b/2) c(y)^2 dy with
+        c(y) = c_r(1 - 2y/b) and S = 0.5*b*c_r. Substituting u = 2y/b (so
+        du = 2/b dy, u in [0,1]):
+
+            integral_0^(b/2) c(y)^2 dy = (b/2) * integral_0^1 c_r^2 (1-u)^2 du
+                                       = (b/2) * c_r^2 * (1/3)
+
+            MAC = (2/S) * (b/2) * c_r^2/3 = (2/(0.5 b c_r)) * (b c_r^2/6)
+                = (2 c_r/3)
+
+        This matches the general trapezoidal-wing formula
+        MAC = (2/3) c_r (1+lambda+lambda^2)/(1+lambda) at taper ratio
+        lambda=0 (zero tip chord), and matches the reference chord used for
+        C_m in NASA TN D-6994 (Snyder & Lamar 1972), c_bar = (2/3) c_r --
+        see DESIGN.md.
+        """
+        return (2.0 / 3.0) * self.root_chord
+
+    @property
+    def mac_leading_edge_x(self) -> float:
+        """Streamwise position [m] of the MAC strip's own leading edge, from the apex.
+
+        This is a DIFFERENT quantity from :attr:`mean_aerodynamic_chord`
+        (which is a LENGTH) -- it is the x-location of the leading edge at
+        the spanwise station y* where c(y*) = MAC. For the general
+        trapezoidal-wing formula, x_LE,MAC = (b/6) * (1+2*lambda)/(1+lambda)
+        * tan(Lambda_LE); at taper ratio lambda=0 this reduces to
+        (b/6)*tan(Lambda_LE) = c_r/3 (using tan(Lambda_LE) = 2 c_r/b).
+
+        Provided for documentation/figure purposes only; the M5 pitching-
+        moment force-application locations (x_attached, x_vortex) are
+        independent, separately-derived quantities -- see
+        pitching_moment.py and DESIGN.md, which explicitly do not conflate
+        MAC length, MAC leading-edge location, aerodynamic center, and
+        center of pressure.
+        """
+        return self.root_chord / 3.0
+
+    # ------------------------------------------------------------------
     # Alternative (inverse) constructors
     # ------------------------------------------------------------------
 

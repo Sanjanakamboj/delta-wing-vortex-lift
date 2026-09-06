@@ -805,7 +805,254 @@ be monotonic, and it is not.
   specific wings, not a validation of this project's generic, illustrative
   geometry or its assumed sensitivity parameters.
 
-## 12. Known limitations (Milestone 1)
+## 12. Milestone 5 — conceptual pitching moment and center of pressure
+
+### 12.1 Source audit
+
+- M. H. Snyder, Jr. and J. E. Lamar, *Application of the Leading-Edge-
+  Suction Analogy to Prediction of Longitudinal Load Distribution and
+  Pitching Moments for Sharp-Edged Delta Wings*, NASA TN D-6994, October
+  1972 (primary PDF read directly). Extends Polhamus's leading-edge-suction
+  analogy (already used for M2/M3) to the CHORDWISE distribution of both
+  the potential-flow and vortex-lift contributions, and to pitching moment.
+  Key findings adopted here:
+    - They nondimensionalize $C_m$ about the **half-root-chord**,
+      $x_{ref}=c_r/2$, and use reference chord $\bar c = (2/3)c_r$ — which
+      is exactly this project's independently derived triangular-planform
+      MAC (§2, extended below). Both conventions are adopted directly.
+    - For delta wings with $AR\le2$ (this project's $AR=1.87$ qualifies),
+      the potential-flow and vortex-lift longitudinal load distributions
+      have **similar shape**, with only "slightly different centroids,"
+      and the vortex-lift loading grows **more rapidly** with $\alpha$ than
+      the potential-flow loading.
+    - The vortex-lift contribution "produces a stabilizing moment and
+      becomes the larger contributor at the high angles of attack" — a
+      nose-down-tending pitching increment growing with $\alpha$, consistent
+      with a vortex-force centroid aft of $x_{ref}=c_r/2$.
+    - Neither this report nor Polhamus's own reports assign a single
+      universal chordwise fraction to the vortex-lift force location; the
+      report's own central finding is that it is *close to but not
+      identical to* the potential-flow centroid for wings in our AR range.
+- R. T. Jones, *Properties of Low-Aspect-Ratio Pointed Wings at Speeds
+  Below and Above the Speed of Sound*, NACA Report 835, 1946. Foundational
+  slender-wing-theory result: sectional lift growth is tied to the local
+  rate of increase of section width, with "sections behind the [maximum-
+  width] section developing no lift." For a pure triangular planform, local
+  span increases monotonically all the way to the trailing edge (the
+  maximum-width station), so the whole wing lifts and slender-wing theory
+  gives sectional loading growing linearly in $x$. This project
+  **independently integrates** that linear sectional-loading law (§12.3),
+  rather than asserting the resulting fraction from memory.
+
+**Answers to the five source-audit questions posed for this milestone:**
+
+1. *Where is the attached-flow aerodynamic center assumed?* $x/c_r=2/3$,
+   derived (§12.3) from Jones's (1946) slender-wing sectional-loading
+   principle.
+2. *Where does vortex lift act relative to attached flow?* The most
+   directly applicable source (Snyder & Lamar, for our exact $AR\le2$
+   regime) finds the two chordwise centroids have similar shape but are
+   not identical; no universal fraction is given.
+3. *Does vortex lift shift the resultant CP forward or aft with $\alpha$?*
+   Ambiguous in the literature at the level of precision this project can
+   use — Snyder & Lamar report a growing nose-down (aft-centroid-consistent)
+   moment increment, but do not give an exact, geometry-general answer.
+   This project does **not** force a forward or aft conclusion; instead it
+   makes the force-location assumption explicit and studies the sensitivity
+   (§12.7).
+4. *How geometry/Mach/Re/breakdown-dependent is this?* Strongly — Snyder &
+   Lamar's own centroid-similarity conclusion is explicitly bounded to
+   $AR\le2$ and their comparison with experiment shows the theory over-
+   predicts stability because of real (finite-Re, tip-loss) effects absent
+   from the reduced-order theory.
+5. *Is there a defensible reduced-order relationship for this project?*
+   Yes: adopt Jones's derived $2/3$ for the attached term, and Snyder &
+   Lamar's AR$\le$2 similar-centroid finding to set the vortex term's
+   *nominal* location equal to the attached term's, with an explicit,
+   labeled sensitivity study rather than a fabricated distinct location.
+
+### 12.2 Coordinate system and reference geometry
+
+$x=0$ at the apex, $x$ positive aft (same convention as `geometry.py`);
+the root trailing edge is at $x=c_r$. All force-application and reference
+locations are expressed as dimensionless fractions $\hat x = x/c_r \in
+[0,1]$, so the moment model never needs the wing's absolute size (matching
+this project's general scale-invariance of $C_L$/$C_D$).
+
+### 12.3 MAC derivation (extends §2)
+
+For this triangular planform, local chord $c(y) = c_r(1-2y/b)$ for
+$y\in[0,b/2]$. The standard aerodynamic-mean-chord definition
+$\text{MAC} = (2/S)\int_0^{b/2} c(y)^2\,dy$ integrates in closed form (via
+$u=2y/b$) to
+
+$$\text{MAC} = \frac{2}{3}c_r$$
+
+matching the general trapezoidal-wing formula
+$\text{MAC}=\tfrac23 c_r\tfrac{1+\lambda+\lambda^2}{1+\lambda}$ at taper
+ratio $\lambda=0$, and matching Snyder & Lamar's reference chord
+$\bar c=(2/3)c_r$ exactly. Implemented as
+`DeltaWingGeometry.mean_aerodynamic_chord` (additive; §2's M1 quantities
+are unchanged) and independently verified in
+`tests/test_geometry.py::test_mac_numerical_integration_agreement` via
+direct trapezoidal-rule integration of $c(y)^2$ — not by calling the
+analytical property to generate its own expected value.
+
+A separate, **not-to-be-confused-with-MAC-length** quantity, the MAC
+strip's own leading-edge $x$-location, is $x_{LE,\text{MAC}} =
+(b/6)\tan\Lambda_{LE} = c_r/3$ at $\lambda=0$ (general formula
+$x_{LE,\text{MAC}}=\tfrac{b}{6}\tfrac{1+2\lambda}{1+\lambda}\tan\Lambda_{LE}$).
+This is provided (`mac_leading_edge_x`) purely for the Figure D schematic
+and is never used as a force-application location — MAC length, MAC
+leading-edge location, aerodynamic center, and center of pressure are kept
+strictly distinct throughout this module and its tests.
+
+### 12.4 Independent derivation of $x_{attached}/c_r = 2/3$
+
+Per Jones (1946), assume the potential-flow sectional loading
+$dC_N/d\hat x \propto \hat x$ (linear growth to the trailing edge, the
+slender-wing-theory consequence of local span/width growing linearly with
+$x$ for a pure triangle). The force-application centroid is then
+
+$$\hat x_{attached} = \frac{\int_0^1 \hat x \cdot \hat x \, d\hat x}{\int_0^1 \hat x \, d\hat x} = \frac{1/3}{1/2} = \frac{2}{3}$$
+
+a short, self-contained calculus derivation (not copied from any
+secondary source), reproducing the classical "two-thirds root chord"
+result frequently cited for slender/delta-wing potential-flow aerodynamic
+centers.
+
+### 12.5 Moment sign convention (derived)
+
+$x$ positive aft, lift positive up. Consider an upward force $L$ at
+$x_{\text{force}}$ about reference $x_{ref}$: if the force is **aft** of
+the reference ($x_{\text{force}}>x_{ref}$), it rotates the nose **down**
+about that reference (see-saw intuition: pushing up at the back tips the
+front down). Using the standard aerospace convention that nose-up is
+positive $C_m$:
+
+$$M = -L\,(x_{\text{force}}-x_{ref}) \;\Rightarrow\; C_m = -C_L\,\frac{x_{\text{force}}-x_{ref}}{c_{ref}}$$
+
+negative (nose-down) when the force is aft of $x_{ref}$ and $L>0$, positive
+(nose-up) when forward — verified directly in
+`test_moment_arm_sign_convention_force_aft_of_ref_is_nose_down`.
+
+### 12.6 Force-location assumptions and center-of-pressure derivation
+
+Nominal, explicit, source-motivated parameters (`PitchingMomentParameters`
+defaults): $\hat x_{attached}=2/3$ (§12.4), $\hat x_{vortex}=2/3$ (nominal,
+co-located — §12.1's AR$\le$2 finding), $\hat x_{ref}=0.5$, $\hat
+c_{ref}=2/3$ (§12.3), $C_{m0}=0$ (symmetric wing, no source justifies a
+nonzero offset).
+
+$$C_{m,\text{attached}} = -C_{L,\text{attached}}\frac{\hat x_{attached}-\hat x_{ref}}{\hat c_{ref}}, \quad C_{m,\text{vortex}} = -C_{L,\text{vortex,eff}}\frac{\hat x_{vortex}-\hat x_{ref}}{\hat c_{ref}}, \quad C_{m,\text{total}}=C_{m0}+C_{m,\text{attached}}+C_{m,\text{vortex}}$$
+
+Combining the two moment-arm equations and requiring an equivalent single
+force at $\hat x_{cp}$ reproducing the same total moment (with $C_{m0}=0$)
+gives, after the $\hat x_{ref}$ terms cancel algebraically (worked out in
+full in `pitching_moment.py`'s module docstring):
+
+$$\hat x_{cp} = \frac{C_{L,\text{attached}}\,\hat x_{attached} + C_{L,\text{vortex,eff}}\,\hat x_{vortex}}{C_{L,\text{total}}}$$
+
+— a **reference-point-independent** physical location, as it must be. This
+is the load-bearing identity verified in
+`test_moment_reconstructed_from_cp_matches_direct_sum` (residual
+$<10^{-12}$) and in the module's own `moment_from_center_of_pressure`
+reconstruction. $\hat x_{cp}$ is undefined (returned as `NaN`, never
+fabricated) wherever $C_{L,\text{total}}=0$ exactly — in particular at
+$\alpha=0$.
+
+Because $\hat x_{vortex}=\hat x_{attached}$ in the nominal model, $\hat
+x_{cp}\equiv2/3$ for every $\alpha$ in that case — a direct, correctly-
+predicted consequence of the co-located assumption, not an error. All
+center-of-pressure *movement* results in this project's figures and study
+script therefore come from the explicit $\hat x_{vortex}$ **offset**
+sensitivity cases (§12.7), never from the nominal case alone.
+
+### 12.7 Sensitivity rationale
+
+- **Vortex force location**, $\hat x_{vortex} = \hat x_{attached} \pm
+  0.10$: the single most consequential and least-validated assumption in
+  this module (§12.1, point 3), so this is the primary sensitivity study.
+  At $\alpha=25°$, $C_{m,\text{total}}$ ranges from $-0.337$ to $-0.410$
+  across this $\pm0.10$ band — a larger spread than any numerical
+  precision concern, exactly as expected for an assumption this uncertain.
+- **Moment reference point**, $\hat x_{ref}\in\{0.40,0.50,0.60\}$: purely a
+  bookkeeping choice (any single physical moment transforms consistently
+  under $x_{ref}$ per the derived arm identity, verified in
+  `test_changing_x_ref_shifts_moment_by_expected_amount`); studied to make
+  that transformation and its magnitude explicit rather than assumed.
+
+### 12.8 Breakdown coupling
+
+This module uses `breakdown.effective_vortex_lift_coefficient` (M4)
+**directly**, never reimplementing or duplicating the effectiveness
+calculation (verified in `test_m4_effectiveness_used_exactly`). Vortex
+breakdown therefore changes total lift, $\hat x_{cp}$, and $C_m$ purely
+through its existing, unchanged effect on $C_{L,\text{vortex,eff}}$ — there
+is no independent pitching-moment breakdown multiplier. Below the M4
+transition ($f_b=1$ to floating-point precision, $\alpha\lesssim10°$ for
+the default parameters), this module's outputs reduce to the pre-breakdown
+(M2-consistent) moment model within $10^{-4}$ absolute tolerance
+(`test_below_transition_moment_matches_pre_breakdown_model`).
+
+### 12.9 Independent verification
+
+`tests/test_pitching_moment.py` includes (see the file for the complete
+set; 41 tests): $\alpha=0$ zero-moment identity; independent force-arm
+hand checks for both the attached and vortex contributions; the derived
+sign convention (force aft of reference $\Rightarrow$ nose-down); the
+additive total-moment identity and $C_{m0}$ additivity; the
+center-of-pressure weighted-average identity and its exact moment
+reconstruction (including with nonzero $C_{m0}$); $\hat x_{cp}$ bounded
+between $\hat x_{attached}$ and $\hat x_{vortex}$; `NaN` at zero total
+lift (both scalar and array); scalar/array consistency; finite outputs
+over the declared domain; invalid-parameter rejection (all four fractional
+parameters bounded to $[0,1]$, $c_{ref}>0$, `cm0` finite); sensitivity-
+direction checks for $\hat x_{vortex}$, $\hat x_{ref}$, and vortex
+fraction; the breakdown-moves-$\hat x_{cp}$-toward-$\hat x_{attached}$
+trend; exact use of the M4 effectiveness factor; below-transition M4/M5
+consistency; hard-coded M1/M2/M3/M4 regressions; and a full-pipeline
+independent hand-formula check tying every step together. `geometry.py`'s
+new MAC helpers are verified separately in `tests/test_geometry.py`
+(analytical value, independent numerical integration, bounds, dimensional
+scaling, and the MAC-leading-edge-$x$ formula) — all additive, with the
+pre-existing M1 geometry tests passing unchanged (confirming no
+regression).
+
+### 12.10 Isolated-wing pitching tendency vs. complete-aircraft stability
+
+This project may report a local $dC_m/d\alpha$ about the declared
+reference point (e.g. §13/`scripts/pitching_moment_study.py`'s
+$\alpha\in[10°,15°]$ interval) and calls it strictly the **isolated-wing
+static pitching tendency about the chosen reference point**. It must never
+be described as "aircraft longitudinal stability," because this model has
+no fuselage, no tail, no CG, no propulsion moments, and no control
+surfaces — a negative $dC_m/d\alpha$ here says nothing about a complete
+aircraft's actual stability margin. Likewise, a $C_m=0$ crossing in any
+figure is never labeled a trim point (no trim model exists), and an
+$x_{ref}$ sensitivity is never called a "CG envelope."
+
+### 12.11 Validity boundaries
+
+- Force locations ($\hat x_{attached}$, $\hat x_{vortex}$) and reference
+  choices ($\hat x_{ref}$, $\hat c_{ref}$) are explicit, source-motivated
+  but ultimately conceptual parameters for this generic wing — not
+  calibrated or validated against experimental or CFD data for this
+  specific geometry.
+- $\hat x_{vortex}=\hat x_{attached}$ nominally, which makes the nominal
+  $\hat x_{cp}$ constant by construction; all reported CP *movement* comes
+  from the explicit sensitivity offset, not the nominal case.
+- Uses the M4 effective vortex lift as-is; no independent breakdown
+  treatment for pitching moment.
+- No trim, control surfaces, CG sizing, dynamic-stability derivatives,
+  CFD, or real-aircraft calibration — out of scope for this milestone.
+- No experimental or CFD validation is performed in this project; the
+  qualitative trends cited from Snyder & Lamar and Jones describe *their*
+  theoretical/experimental findings for *their* specific wings, not a
+  validation of this project's generic, illustrative geometry or its
+  assumed force locations.
+
+## 13. Known limitations (Milestone 1)
 
 - The attached-flow model is a classical, moderate/high-AR lifting-line
   result; its assumptions are known to be violated by this low-AR,
