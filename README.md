@@ -194,12 +194,110 @@ python scripts/make_vortex_sensitivity_figure.py
   extrapolated.
 - No experimental or CFD validation is used or implied.
 
+## Milestone 3: drag due to lift and aerodynamic efficiency
+
+### Engineering question
+
+> How much drag does the leading-edge vortex cost, and does the extra lift
+> it provides actually improve (or degrade) the wing's lift-to-drag ratio
+> across the conceptual angle-of-attack range?
+
+### Drag decomposition equations
+
+$$C_{Di,\text{attached}}(\alpha) = \frac{C_{L,\text{attached}}(\alpha)^2}{\pi e\,AR} \qquad \text{(classical lifting-line induced drag, unchanged } e, AR\text{ from M1)}$$
+
+$$C_{D,\text{vortex}}(\alpha,\Lambda_{LE}) = C_{L,\text{vortex}}(\alpha,\Lambda_{LE})\,\tan\alpha \qquad \text{(Polhamus-style, applied to the vortex term only)}$$
+
+$$C_{D,\text{total}}(\alpha) = C_{D0} + C_{Di,\text{attached}}(\alpha) + C_{D,\text{vortex}}(\alpha,\Lambda_{LE}), \qquad L/D = \frac{C_{L,\text{total}}}{C_{D,\text{total}}}$$
+
+with $C_{D0} = 0.028$: an explicit, **illustrative, uncalibrated**
+zero-lift/profile-drag constant. This is a **hybrid, reduced-order,
+Polhamus-inspired** model — not Polhamus's own combined drag formula. See
+[DESIGN.md](DESIGN.md) for exactly why and what is simplified.
+
+### Sources
+
+- E. C. Polhamus, *Application of the Leading-Edge-Suction Analogy of
+  Vortex Lift to the Drag Due to Lift of Sharp-Edge Delta Wings*, NASA TN
+  D-4739, 1968 — his eq. (4), $\Delta C_D = C_L\tan\alpha$, is the
+  geometric basis for $C_{D,\text{vortex}}$ here.
+- Classical Prandtl lifting-line induced drag (e.g. Anderson, *Fundamentals
+  of Aerodynamics*) for $C_{Di,\text{attached}}$, consistent with M1's own
+  $(e, AR)$.
+
+### Representative results ($\Lambda_{LE}=65°$, $C_{D0}=0.028$)
+
+| $\alpha$ | $C_{L,\text{total}}$ | $C_{D,\text{total}}$ | $L/D$ |
+|---:|---:|---:|---:|
+| 10° | 0.5984 | 0.0928 | 6.45 |
+| 15° | 0.9642 | 0.1921 | 5.02 |
+| 20° | 1.3636 | 0.3500 | 3.90 |
+
+### Attached-only vs. attached+vortex — key finding
+
+| $\alpha$ | $L/D$ (attached-only) | $L/D$ (attached+vortex) | % change |
+|---:|---:|---:|---:|
+| 5° | 6.276 | 6.543 | **+4.3%** |
+| 10° | 6.630 | 6.451 | **−2.7%** |
+| 15° | 5.567 | 5.020 | **−9.8%** |
+| 20° | 4.592 | 3.896 | **−15.2%** |
+
+**Vortex lift does not uniformly improve efficiency.** It gives a small L/D
+benefit near $\alpha=5°$, but the vortex-drag penalty grows faster than the
+extra lift as $\alpha$ increases, so L/D is *lower* with vortex lift included
+at 10° and beyond. Best sampled L/D within $\alpha\in[0°,25°]$: **6.86 at
+7.7°** (attached-only) vs. **6.97 at 7.0°** (attached+vortex) — both figures
+are grid-search results within the declared range, not claimed aerodynamic
+optima.
+
+### Sensitivity
+
+Best sampled L/D is fairly sensitive to the illustrative $C_{D0}$: 8.23
+($C_{D0}=0.02$) → 6.74 ($C_{D0}=0.03$) → 5.85 ($C_{D0}=0.04$). It is much
+less sensitive to $\pm20\%$ on $K_v$ (6.95–7.00).
+
+### Figures
+
+- [`figures/drag_decomposition.png`](figures/drag_decomposition.png) — $C_{D0}$, $C_{Di,\text{attached}}$, $C_{D,\text{vortex}}$, $C_{D,\text{total}}$ vs. $\alpha$.
+- [`figures/lift_drag_polar.png`](figures/lift_drag_polar.png) — $C_L$ vs. $C_D$ for both models, with $\alpha$-labeled points.
+- [`figures/lift_to_drag_ratio.png`](figures/lift_to_drag_ratio.png) — $L/D$ vs. $\alpha$ for both models, best-sampled points marked.
+- [`figures/drag_sensitivity.png`](figures/drag_sensitivity.png) — $L/D$ vs. $\alpha$ across $C_{D0}$ values, and best sampled $L/D$ vs. $C_{D0}$.
+
+Reproduce with:
+
+```bash
+python scripts/drag_polar_study.py
+python scripts/make_drag_decomposition_figure.py
+python scripts/make_lift_drag_polar_figure.py
+python scripts/make_lift_to_drag_ratio_figure.py
+python scripts/make_drag_sensitivity_figure.py
+```
+
+### Limitations
+
+- $C_{D0}=0.028$ is illustrative and uncalibrated — not fit to any real
+  aircraft or dataset; it represents skin-friction/form/interference drag
+  entirely outside this lift-based model.
+- $C_{D,\text{vortex}}$ resolves only the vortex-lift force via
+  $\tan\alpha$; the attached term instead uses classical induced drag —
+  this is a documented hybrid, not Polhamus's own combined formula (which
+  resolves the *total* zero-suction lift via $\tan\alpha$).
+- No stall, vortex breakdown, or drag-rise model; all results are only
+  claimed valid over $\alpha\in[0°,25°]$ and must not be extrapolated.
+- "Best sampled L/D" values are grid-search maxima over the declared
+  range, not claimed aerodynamic optima.
+- No experimental or CFD validation is used or implied.
+
 ## Roadmap
 
 - **Milestone 1:** geometry, conventions, attached-flow baseline. ✅
 - **Milestone 2:** Polhamus-style reduced-order vortex-lift contribution,
   combined with the unchanged attached-flow baseline into a total lift
   curve, with sweep/coefficient sensitivity study. ✅
-- **Milestone 3 (not started):** out of scope for now — no drag, L/D,
-  pitching moment, stability, vortex breakdown, stall, CFD comparison, or
-  aircraft sizing has been implemented.
+- **Milestone 3:** reduced-order, Polhamus-inspired drag-due-to-lift model,
+  aerodynamic polar, L/D comparison between attached-only and
+  attached+vortex models, and drag-assumption sensitivity. ✅
+- **Milestone 4 (not started):** out of scope for now — no vortex
+  breakdown, stall, pitching moment, trim, longitudinal stability, CFD
+  comparison, real-aircraft matching, or structural/flight-performance work
+  has been implemented.

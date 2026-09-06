@@ -411,7 +411,163 @@ current run is exactly `0.0`.
   full original theory, not a validation of this project's simplified
   reduced-order variant.
 
-## 10. Known limitations (Milestone 1)
+## 10. Milestone 3 — reduced-order Polhamus-inspired drag and L/D
+
+### 10.1 Source audit
+
+- E. C. Polhamus, *Application of the Leading-Edge-Suction Analogy of
+  Vortex Lift to the Drag Due to Lift of Sharp-Edge Delta Wings*, NASA TN
+  D-4739, August 1968
+  (<https://ntrs.nasa.gov/citations/19680022518>, primary PDF read directly
+  for this milestone). This follow-up to TN D-3767 addresses exactly the
+  drag-due-to-lift problem needed here, for the same family of sharp-edge
+  delta wings ($AR = 0.25$–$2.0$), and compares three theoretical
+  assumptions against wind-tunnel data.
+- Classical Prandtl lifting-line induced drag, as presented in standard
+  texts (e.g. Anderson, *Fundamentals of Aerodynamics*) and the same
+  university course notes cited in §5 for the attached-flow slope: for an
+  elliptically-loaded (or $e$-corrected) finite wing,
+  $C_{Di} = C_L^2/(\pi e\,AR)$.
+
+### 10.2 What Polhamus (1968) derived
+
+For a thin, sharp leading edge under the Kutta-type (zero-leading-edge-
+suction) condition already used in TN D-3767, the resultant aerodynamic
+force has no suction component in the wing-chord plane and is therefore
+directed perpendicular to the chord. Resolving *that* force into wind axes
+(lift = force$\times\cos\alpha$, drag-due-to-lift = force$\times\sin\alpha$)
+gives, in coefficient form,
+$$\Delta C_D = C_L\tan\alpha \qquad \text{(Polhamus (1968), eq. 4)}$$
+which he applies to his own *combined* potential+vortex lift coefficient
+(his eq. 3, identical to eq. 15 of TN D-3767) to get
+$$\Delta C_D = K_p\sin^2\alpha\cos\alpha + K_v\sin^3\alpha \qquad \text{(eq. 5)}$$
+He compares this "zero-leading-edge-suction with vortex lift" assumption
+against two others (zero suction with **no** vortex lift, and full
+leading-edge suction / classical induced drag) and against experimental
+data for $AR = 0.25$–$2.0$. His key findings, directly relevant here:
+
+- The zero-suction-with-vortex-lift assumption (eq. 4/5) matches
+  experimental drag due to lift closely across this aspect-ratio range.
+- For very slender, highly-swept wings, drag due to lift **can be lower**
+  with vortex lift than the classical full-leading-edge-suction (elliptical
+  potential-flow) induced-drag prediction — because the vortex lift lets
+  the wing reach a given $C_L$ at a lower $\alpha$ than attached flow alone
+  would require, more than compensating for the lost leading-edge thrust.
+
+### 10.3 What this project adopts, and the resulting hybrid model
+
+**Adopted:** the geometric argument behind eq. (4) — a force with no
+leading-edge suction resolves into drag-due-to-lift equal to its lift
+component times $\tan\alpha$ — applied here to the **vortex-lift component
+alone**, since `vortex_lift.py`'s $C_{L,\text{vortex}}$ was itself derived
+(in TN D-3767) under exactly that same zero-suction assumption:
+$$C_{D,\text{vortex}}(\alpha,\Lambda_{LE}) = C_{L,\text{vortex}}(\alpha,\Lambda_{LE})\tan\alpha$$
+implemented as `vortex_drag_coefficient` in
+[`drag.py`](src/delta_vortex_lift/drag.py).
+
+**Deliberately NOT adopted:** Polhamus's own eq. (4)/(5) applies
+$\tan\alpha$ to his *combined* lift coefficient, because in his theory
+*both* the potential and vortex terms assume zero leading-edge suction.
+This project's Milestone 1 attached-flow baseline
+($C_{L,\text{attached}} = a\alpha$) is ordinary lifting-line theory, which
+assumes *normal* (non-zero) leading-edge suction — the opposite assumption.
+Resolving it via $\tan\alpha$ would therefore misapply the physical
+argument behind eq. (4) to a term it was never derived for. Instead, the
+attached contribution keeps its own textbook induced-drag relation:
+$$C_{Di,\text{attached}}(\alpha) = \frac{C_{L,\text{attached}}(\alpha)^2}{\pi e\,AR}$$
+using the same $(e, AR)$ already declared in `attached_flow.py` — no new
+efficiency parameter is introduced. The two are then simply summed with an
+illustrative profile-drag term:
+$$C_{D,\text{total}}(\alpha) = \underbrace{C_{D0}}_{\text{illustrative}} + \underbrace{\frac{C_{L,\text{attached}}^2}{\pi e\,AR}}_{\text{classical, M1-consistent}} + \underbrace{C_{L,\text{vortex}}\tan\alpha}_{\text{Polhamus-style}}$$
+
+This is therefore a **hybrid, reduced-order, Polhamus-inspired drag model**
+— explicitly **not** Polhamus's own combined drag-due-to-lift formula — and
+is called out as such everywhere it is used. The deviation mirrors, for
+drag, exactly the same M1/M2 boundary decision already made and documented
+for lift in §9.4.
+
+### 10.4 Force / sign convention
+
+Consistent with §3 and §9.5: for $\alpha \in [0°, 25°)$ (the declared study
+range), $\tan\alpha > 0$ and $C_{L,\text{vortex}} \ge 0$, so
+$C_{D,\text{vortex}} \ge 0$ throughout; $C_{Di,\text{attached}} \ge 0$
+trivially as a squared quantity. Both vanish exactly at $\alpha=0$. Drag
+coefficients are defined in the conventional wind-axes sense (drag is
+positive opposing the flight direction); no thrust or negative-drag
+contribution is modeled.
+
+### 10.5 Profile drag assumption ($C_{D0}$)
+
+$C_{D0} = 0.028$ (module default `CD0_DEFAULT`) is an explicit, illustrative
+constant within the stated conceptual 0.02–0.04 range, representing
+skin-friction, form, and interference drag that this lift-based reduced-
+order model does not otherwise compute. It is **not** calibrated to any
+real aircraft, panel code, or wind-tunnel dataset, and is treated purely as
+a sensitivity parameter (§10.8) — never presented as a real-aircraft drag
+value.
+
+### 10.6 L/D definition
+
+$$L/D = \frac{C_{L,\text{total}}}{C_{D,\text{total}}}$$
+implemented as `lift_to_drag_ratio`, which returns exactly `0.0` at
+$\alpha=0$ (where $C_L=0$ and $C_D=C_{D0}\ne0$, so $L/D=0$ is the correct
+value, not a numerical artifact) and raises `ValueError` for the
+mathematically undefined case $C_D=0$ with $C_L\ne0$ (which does not occur
+anywhere in this project's declared study range, since $C_{D0}>0$).
+
+### 10.7 Independent verification
+
+`tests/test_drag.py` includes (see the file for the complete set):
+$\alpha=0$ identities for every drag term and for L/D; independent
+hand-formula checks for both $C_{Di,\text{attached}}$ and
+$C_{D,\text{vortex}}$; the additive identity
+$C_{D,\text{total}}=C_{D0}+C_{Di,\text{attached}}+C_{D,\text{vortex}}$;
+non-negativity and monotonic growth of every drag term with no
+discontinuities over $\alpha\in[0°,25°]$; absence of NaN/Inf; scalar/array
+consistency; invalid-input rejection (non-finite $\alpha$, $\alpha$ too
+close to $90°$, $C_{D0}<0$, invalid $AR$/$e$, $C_D=0$ with $C_L\ne0$); the
+L/D identity itself; hard-coded regressions confirming the exact M1
+attached-lift and M2 vortex-lift numbers are unchanged; degree/radian
+cross-checks against the existing `*_deg` helpers; an exact identity
+($C_{D,\text{vortex}} = C_{L,\text{vortex}}\tan\alpha$ pointwise); and
+sensitivity-direction checks (higher $C_{D0}$ lowers L/D; higher $K_v$
+raises total drag). `scripts/drag_polar_study.py` additionally reconstructs
+one $C_{D,\text{total}}$ value directly from the documented formulas by
+hand; the residual in the current run is exactly `0.0`.
+
+### 10.8 Sensitivity rationale
+
+- **$C_{D0}$** ($0.02$/$0.03$/$0.04$): this is the single most uncertain,
+  purely illustrative input in the whole drag model, so quantifying how
+  much it moves the headline best-sampled-L/D result (8.23 → 6.74 → 5.85
+  across the three cases) is essential to interpreting the results
+  honestly.
+- **$K_v \pm20\%$**: reuses the same M2 coefficient-sensitivity rationale
+  (§9.7) to show that, unlike $C_{D0}$, the vortex-lift coefficient's
+  uncertainty has only a small effect on best-sampled L/D (6.95–7.00) —
+  most of the L/D uncertainty in this model comes from $C_{D0}$, not from
+  the Polhamus-style vortex terms.
+
+### 10.9 Scope / validity limits
+
+- Restricted to and only claimed valid over $\alpha\in[0°,25°]$, matching
+  Milestone 2; no stall, vortex breakdown, or drag-rise model is included,
+  and none is implied by any figure or table.
+- "Best sampled L/D" values reported anywhere in this project (README,
+  study script, figures) are grid-search maxima over the sampled $\alpha$
+  range — never claimed aerodynamic optima, and the wording is kept
+  explicit throughout for this reason.
+- The hybrid drag decomposition (§10.3) is a documented simplification,
+  not a reproduction of Polhamus's own combined drag-due-to-lift formula.
+- No pitching moment, longitudinal stability, trim, supersonic wave drag,
+  or structural consideration is included — out of scope for this
+  milestone.
+- No experimental or CFD validation is performed in this project; the
+  agreement Polhamus reports (§10.2) describes *his* validation of the full
+  original theory, not a validation of this project's hybrid, simplified
+  variant.
+
+## 11. Known limitations (Milestone 1)
 
 - The attached-flow model is a classical, moderate/high-AR lifting-line
   result; its assumptions are known to be violated by this low-AR,
